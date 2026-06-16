@@ -1,0 +1,122 @@
+{
+  "settings": {
+    "corePoolSize": 4,
+    "sessionQuestionCount": 4
+  },
+  "categories": [
+    {
+      "id": "ciemność",
+      "label": "ciemność",
+      "active": true
+    },
+    {
+      "id": "światło",
+      "label": "światło",
+      "active": true
+    },
+    {
+      "id": "eksperymenty",
+      "label": "eksperymenty",
+      "active": true
+    },
+    {
+      "id": "womai",
+      "label": "womai",
+      "active": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "fallback-ciemnosc-1",
+      "categoryId": "ciemność",
+      "prompt": "Który zmysł szczególnie pomaga człowiekowi orientować się wtedy, gdy nie korzysta ze wzroku?",
+      "choices": [
+        {
+          "id": "a",
+          "text": "Słuch"
+        },
+        {
+          "id": "b",
+          "text": "Smak"
+        },
+        {
+          "id": "c",
+          "text": "Węch"
+        }
+      ],
+      "correctChoiceId": "a",
+      "explanation": "Słuch pomaga rozpoznawać kierunek, odległość i charakter wielu obiektów w otoczeniu. Dlatego w ciemności zaczynamy mocniej zwracać uwagę na dźwięki.",
+      "active": true,
+      "isCore": true
+    },
+    {
+      "id": "fallback-swiatlo-1",
+      "categoryId": "światło",
+      "prompt": "Co najlepiej pomaga sprawdzić, jak światło wpływa na nasze postrzeganie?",
+      "choices": [
+        {
+          "id": "a",
+          "text": "Obserwacja i eksperyment"
+        },
+        {
+          "id": "b",
+          "text": "Zgadywanie bez patrzenia"
+        },
+        {
+          "id": "c",
+          "text": "Ignorowanie warunków otoczenia"
+        }
+      ],
+      "correctChoiceId": "a",
+      "explanation": "Najlepiej działa obserwacja i eksperyment, bo pozwalają porównać wrażenia w różnych warunkach i zauważyć, jak łatwo mózg interpretuje bodźce.",
+      "active": true,
+      "isCore": true
+    },
+    {
+      "id": "fallback-eksperymenty-1",
+      "categoryId": "eksperymenty",
+      "prompt": "Po co w centrum nauki zadaje się pytania i wykonuje doświadczenia?",
+      "choices": [
+        {
+          "id": "a",
+          "text": "Żeby samodzielnie odkrywać zależności"
+        },
+        {
+          "id": "b",
+          "text": "Żeby tylko zapamiętać gotową odpowiedź"
+        },
+        {
+          "id": "c",
+          "text": "Żeby uniknąć własnych obserwacji"
+        }
+      ],
+      "correctChoiceId": "a",
+      "explanation": "Pytania i doświadczenia pomagają samodzielnie dojść do wniosków. Dzięki temu wiedza jest bardziej konkretna i łatwiej ją zapamiętać.",
+      "active": true,
+      "isCore": true
+    },
+    {
+      "id": "fallback-womai-1",
+      "categoryId": "womai",
+      "prompt": "Czego dotyczy aplikacja Odkryj WOMAI?",
+      "choices": [
+        {
+          "id": "a",
+          "text": "Krótkich pytań i ciekawostek związanych z WOMAI"
+        },
+        {
+          "id": "b",
+          "text": "Rezerwacji biletów lotniczych"
+        },
+        {
+          "id": "c",
+          "text": "Obsługi poczty elektronicznej"
+        }
+      ],
+      "correctChoiceId": "a",
+      "explanation": "Aplikacja ma pomagać w lekkim, krótkim odkrywaniu WOMAI przez pytania, odpowiedzi i proste wyjaśnienia.",
+      "active": true,
+      "isCore": true
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="511" height="199" viewBox="0 0 511 199" role="img" aria-label="WOMAI">
+  <rect width="511" height="199" rx="24" fill="#000000"/>
+  <text x="83" y="128" fill="#ffffff" font-family="Montserrat, Arial, Helvetica, sans-serif" font-size="78" font-weight="900" letter-spacing="7">WOMAI</text>
+  <path d="M404 50H420L414 65H398Z" fill="#ffc814"/>
+  <image x="0" y="0" width="511" height="199" href="logo-womai-white.png"/>
+</svg>

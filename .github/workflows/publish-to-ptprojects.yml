@@ -1,0 +1,50 @@
+﻿name: Publish to ptprojects
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Odkryj WOMAI
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Check out PT Projects
+        uses: actions/checkout@v4
+        with:
+          repository: piotrktarasewicz/ptprojects
+          token: ${{ secrets.PTPROJECTS_SYNC_TOKEN }}
+          path: target
+
+      - name: Copy application into ptprojects/odkryj-womai
+        run: |
+          set -euo pipefail
+          rm -rf target/odkryj-womai
+          mkdir -p target/odkryj-womai
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            source/ target/odkryj-womai/
+
+      - name: Commit and push if changed
+        run: |
+          set -euo pipefail
+          cd target
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add odkryj-womai
+          if git diff --cached --quiet; then
+            echo "No changes to publish."
+          else
+            git commit -m "Publish Odkryj WOMAI"
+            git push
+          fi

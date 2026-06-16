@@ -1,0 +1,46 @@
+{
+    "facts": [
+        {
+            "id": "womai-czym-jest",
+            "category": "O WOMAI",
+            "title": "Miejsce, które uruchamia zmysły",
+            "text": "WOMAI to przestrzeń, w której nauka, doświadczenie i zmysły spotykają się w praktyce. Gość nie tylko czyta lub słucha o świecie, ale może go sprawdzać przez własne odczucia.",
+            "active": true
+        },
+        {
+            "id": "ciemnosci-przewodnicy",
+            "category": "W stronę ciemności",
+            "title": "Ciemność prowadzona przez doświadczenie",
+            "text": "Na ścieżce w ciemności bardzo ważną rolę pełnią przewodnicy. To oni pomagają gościom bezpiecznie wejść w sytuację, w której wzrok przestaje być głównym źródłem informacji.",
+            "active": true
+        },
+        {
+            "id": "zmysly-sluch",
+            "category": "Zmysły",
+            "title": "Słuch potrafi zaskoczyć",
+            "text": "Gdy nie korzystamy ze wzroku, zaczynamy wyraźniej zauważać dźwięki. Ich kierunek, odległość i charakter mogą powiedzieć o otoczeniu więcej, niż zwykle przypuszczamy.",
+            "active": true
+        },
+        {
+            "id": "swiatlo-obserwacja",
+            "category": "W stronę światła",
+            "title": "Światło zmienia sposób patrzenia",
+            "text": "To, co widzimy, zależy nie tylko od oczu, ale też od światła, kontrastu, tła i interpretacji mózgu. Dlatego proste doświadczenia optyczne potrafią być tak zaskakujące.",
+            "active": true
+        },
+        {
+            "id": "dostepnosc-praktyka",
+            "category": "Dostępność",
+            "title": "Dostępność to praktyka, nie hasło",
+            "text": "O dostępności najłatwiej mówić teoretycznie, ale najlepiej rozumie się ją przez doświadczenie. WOMAI pozwala zobaczyć, jak wiele zależy od sposobu komunikacji, przestrzeni i uważności na drugiego człowieka.",
+            "active": true
+        },
+        {
+            "id": "eksperyment-pytanie",
+            "category": "Eksperymenty",
+            "title": "Dobre pytanie jest początkiem odkrycia",
+            "text": "W centrum nauki pytanie często jest ważniejsze niż szybka odpowiedź. To ono uruchamia ciekawość i prowadzi do samodzielnego sprawdzania, porównywania i wyciągania wniosków.",
+            "active": true
+        }
+    ]
+}

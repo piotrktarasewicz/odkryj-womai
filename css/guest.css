@@ -1,0 +1,50 @@
+body {
+  font-family: "Montserrat", Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(255,200,20,.16), transparent 18%),
+    linear-gradient(180deg, var(--bg) 0%, #050505 100%);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.55;
+}
+.wrap { max-width: 980px; margin: 0 auto; padding: 20px 16px 32px; }
+.card { border: 1px solid var(--border); background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.035)); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; }
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.badge { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 999px; background: rgba(255,200,20,.12); border: 1px solid rgba(255,200,20,.38); color: var(--accent); font-size: 14px; font-weight: 700; }
+h1 { font-size: clamp(2rem, 5vw, 3.7rem); line-height: 1.05; margin: 22px 0 0; letter-spacing: -.04em; }
+h2 { font-size: 1.6rem; line-height: 1.2; margin: 16px 0 0; }
+p { margin: 12px 0 0; }
+.lead { color: var(--muted); font-size: 1.08rem; max-width: 760px; }
+.actions, .meta-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 24px; }
+button { border: 1px solid var(--border); cursor: pointer; border-radius: 16px; padding: 12px 16px; background: rgba(255,255,255,.055); color: var(--text); }
+button:hover:not([disabled]) { border-color: var(--border-strong); background: rgba(255,255,255,.085); }
+button.primary { background: var(--accent); color: #000000; border-color: transparent; font-weight: 800; }
+button.primary:hover:not([disabled]) { background: #ffd34d; }
+button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+button[disabled] { opacity: .55; cursor: not-allowed; }
+.start-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 24px; }
+.option-card { border: 1px solid var(--border); border-radius: 22px; padding: 18px; background: var(--surface-soft); }
+.option-card-primary { border-color: rgba(255,200,20,.45); background: rgba(255,200,20,.08); }
+.option-card h2 { margin-top: 0; }
+.option-card button { margin-top: 18px; width: 100%; }
+.progress-top { margin-bottom: 24px; }
+.progress-meta { display: flex; justify-content: space-between; gap: 12px; align-items: center; font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+.progress-bar { height: 8px; background: rgba(255,255,255,.14); border-radius: 999px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 999px; background: var(--accent); }
+.choices { display: grid; gap: 14px; margin-top: 28px; }
+.choice { width: 100%; text-align: left; padding: 16px; border-radius: 18px; border: 1px solid var(--border); background: rgba(255,255,255,.04); color: var(--text); font-size: 1rem; font-weight: 600; }
+.choice.selected { background: rgba(255,200,20,.12); border-color: var(--accent); }
+.choice.correct { background: rgba(94,231,165,.12); border-color: var(--success); }
+.choice.wrong { background: rgba(255,157,167,.12); border-color: var(--danger); }
+.feedback { margin-top: 24px; padding: 18px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface-soft); }
+.feedback-title { font-weight: 800; margin: 0 0 10px; }
+.summary-box, .fact-card { margin-top: 28px; padding: 22px; border-radius: 22px; border: 1px solid rgba(255,200,20,.3); background: rgba(255,200,20,.07); }
+.help-box { margin-top: 12px; padding: 16px; border-radius: 18px; border: 1px solid var(--border); background: var(--surface-soft); }
+.small-note { font-size: .95rem; color: var(--muted); }
+.error-box { margin-top: 18px; padding: 16px; border: 1px solid rgba(255,157,167,.5); border-radius: 18px; background: rgba(255,157,167,.12); }
+.site-footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.95rem; }
+@media (max-width: 760px) {
+  .start-options { grid-template-columns: 1fr; }
+  .brand-logo { width: 74px; }
+  .card { padding: 20px; }
+}

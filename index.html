@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Odkryj WOMAI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./css/theme.css?v=20260613-2" />
+  <link rel="stylesheet" href="./css/guest.css?v=20260613-2" />
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <div class="topbar brand-header">
+        <div class="brand" aria-label="WOMAI">
+          <div class="brand-mark" aria-hidden="true">
+            <img class="brand-logo" src="./assets/logo-womai-on-black.svg?v=20260613-2" alt="" decoding="async" onerror="this.hidden=true; this.nextElementSibling.hidden=false" />
+            <span class="brand-logo-fallback" hidden>WOMAI</span>
+          </div>
+          <div>
+            <div class="brand-name">Odkryj WOMAI</div>
+            <div class="badge">Quiz doświadczeń</div>
+          </div>
+        </div>
+        <button id="helpBtn" type="button" aria-expanded="false" aria-controls="helpBox">Pomoc</button>
+      </div>
+
+      <div id="helpBox" class="help-box hidden" hidden>
+        <div class="feedback-title">Jak to działa?</div>
+        <div>Możesz zagrać w krótki quiz albo poznać kilka faktów o zmysłach, dostępności i doświadczeniach WOMAI. W quizie po każdej odpowiedzi od razu zobaczysz krótkie wyjaśnienie.</div>
+      </div>
+
+      <div id="startView">
+        <h1>Odkryj świat zmysłów w kilku pytaniach</h1>
+        <p class="lead">Krótki, ciekawy quiz inspirowany doświadczeniami WOMAI. Sprawdź się, poznaj wyjaśnienia i zobacz, jak wiele można odkryć poza oczywistym pierwszym wrażeniem.</p>
+        <div id="loadingBox" class="help-box">Trwa przygotowywanie quizu…</div>
+        <div id="errorBox" class="error-box hidden" aria-live="assertive"></div>
+        <div class="start-options" aria-label="Wybierz sposób odkrywania WOMAI">
+          <div class="option-card option-card-primary">
+            <h2>Quiz</h2>
+            <p>Krótka seria pytań i ciekawych wyjaśnień po każdej odpowiedzi.</p>
+            <button id="startBtn" class="primary" type="button" disabled>Zagraj w quiz</button>
+          </div>
+          <div class="option-card">
+            <h2>Odkryj więcej</h2>
+            <p>Kilka krótkich ciekawostek o zmysłach, dostępności i doświadczeniach WOMAI.</p>
+            <button id="factsBtn" type="button" disabled>Poznaj fakty</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="quizView" class="hidden">
+        <div class="progress-top">
+          <div class="progress-meta">
+            <span id="progressLabel">Pytanie 1 z 4</span>
+            <span id="sessionMeta" class="small-note"></span>
+          </div>
+          <div class="progress-bar" role="progressbar" aria-labelledby="progressLabel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="25"><div id="progressFill" class="progress-fill" style="width:25%"></div></div>
+        </div>
+
+        <div class="badge" id="categoryBadge">Kategoria</div>
+        <h2 id="questionTitle" tabindex="-1" class="focus-anchor">Treść pytania</h2>
+        <div id="choicesWrap" class="choices"></div>
+        <div id="selectionState" class="visually-hidden" aria-live="polite"></div>
+
+        <div id="feedbackBox" class="feedback hidden" aria-live="polite">
+          <div id="feedbackTitle" class="feedback-title focus-anchor" tabindex="-1"></div>
+          <div id="feedbackText"></div>
+        </div>
+
+        <div class="meta-actions">
+          <button id="nextBtn" class="primary" type="button" disabled>Dalej</button>
+          <button id="restartBtn" type="button">Losuj nową sesję</button>
+        </div>
+      </div>
+
+      <div id="factsView" class="hidden">
+        <div class="badge" id="factsBadge">Fakt</div>
+        <h2 id="factsHeading" tabindex="-1" class="focus-anchor">Fakt o doświadczeniach WOMAI</h2>
+        <div class="fact-card">
+          <p id="factsText"></p>
+          <p id="factsMeta" class="small-note"></p>
+        </div>
+        <div class="meta-actions">
+          <button id="nextFactBtn" class="primary" type="button">Następny fakt</button>
+          <button id="factsQuizBtn" type="button">Zagraj w quiz</button>
+          <button id="factsBackBtn" type="button">Wróć</button>
+        </div>
+      </div>
+
+      <div id="summaryView" class="hidden">
+        <div class="badge">Podsumowanie</div>
+        <h2 tabindex="-1" id="summaryHeading" class="focus-anchor">To koniec, brawo!</h2>
+        <div class="summary-box">
+          <p><strong>Poprawnych odpowiedzi:</strong> <span id="scoreText">0 / 4</span></p>
+          <p id="summaryText" class="muted">Jeśli chcesz, w dowolnym momencie możesz tu wrócić. Czeka na Ciebie kolejne wyzwanie.</p>
+        </div>
+        <div class="actions">
+          <button id="playAgainBtn" class="primary" type="button">Zagraj ponownie</button>
+          <button id="summaryFactsBtn" type="button">Poznaj fakty</button>
+        </div>
+      </div>
+
+      <footer class="site-footer">
+        <p>Projekt i rozwój przy współpracy WOMAI: Krzysztof Tarasewicz</p>
+      </footer>
+    </section>
+  </main>
+
+  <script src="./js/config.js?v=20260613-2"></script>
+  <script src="./js/api.js?v=20260613-2"></script>
+  <script src="./js/guest.js?v=20260613-2"></script>
+</body>
+</html>

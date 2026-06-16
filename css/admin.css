@@ -1,0 +1,31 @@
+body { margin:0; font-family:Arial,Helvetica,sans-serif; line-height:1.5; color:var(--admin-text); background:var(--admin-bg); }
+html { font-size:18px; }
+button { cursor:pointer; border:1px solid var(--admin-border); border-radius:6px; padding:10px 14px; background:#fff; color:var(--admin-text); }
+button:hover { background:#f3f4f6; }
+button.primary { background:var(--admin-accent); color:#fff; border-color:var(--admin-accent); }
+button.primary:hover { background:var(--admin-accent-2); border-color:var(--admin-accent-2); }
+button.danger { background:var(--admin-danger); color:#fff; border-color:var(--admin-danger); }
+:focus-visible { outline:3px solid var(--admin-focus); outline-offset:2px; }
+header, main { max-width:1200px; margin:0 auto; padding:20px; }
+header { padding-bottom:0; }
+.box, section { background:var(--admin-panel); border:1px solid var(--admin-border); border-radius:var(--admin-radius); box-shadow:var(--admin-shadow); padding:18px; margin-bottom:var(--admin-gap); }
+.grid2 { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
+.grid3 { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; }
+.field { display:grid; gap:6px; margin-bottom:12px; }
+input[type="text"], input[type="search"], input[type="password"], input[type="url"], select, textarea {
+  width:100%; border:1px solid var(--admin-border); border-radius:6px; padding:10px 12px; background:#fff; color:var(--admin-text);
+}
+textarea { min-height:120px; resize:vertical; }
+.button-row { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
+.muted { color:var(--admin-muted); }
+.live { min-height:1.5em; margin-top:10px; font-weight:700; color:var(--admin-accent-2); }
+.error { min-height:1.5em; margin-top:10px; font-weight:700; color:var(--admin-danger); }
+.summary { border:1px solid var(--admin-border); border-radius:6px; padding:12px; background:#fafafa; }
+.table-wrap { overflow:auto; border:1px solid var(--admin-border); border-radius:6px; }
+table { width:100%; border-collapse:collapse; min-width:1280px; }
+th, td { border-bottom:1px solid var(--admin-border); padding:10px; text-align:left; vertical-align:top; }
+th { background:#f9fafb; }
+.actions-col { display:grid; gap:8px; }
+.pill { display:inline-block; padding:2px 8px; border:1px solid var(--admin-border); border-radius:999px; font-size:.92rem; background:#fff; }
+.brand-logo-placeholder { color: var(--admin-accent); }
+@media (max-width:860px) { .grid2, .grid3 { grid-template-columns:1fr; } header, main { padding:12px; } }

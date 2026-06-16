@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Odkryj Womai — panel administratora v7</title>
+  <link rel="stylesheet" href="../css/theme.css" />
+  <link rel="stylesheet" href="../css/admin.css" />
+</head>
+<body>
+  <header>
+    <div class="box">
+      <div class="brand">
+        <div class="brand-logo-placeholder" aria-hidden="true">W</div>
+        <div>
+          <h1>Odkryj Womai — panel administratora v7</h1>
+          <p>Wersja dopasowana do endpointu z rolami <strong>admin</strong> i <strong>superadmin</strong>.</p>
+        </div>
+      </div>
+      <div id="statsBox"></div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>Połączenie i uprawnienia</h2>
+      <div class="grid3">
+        <div class="field">
+          <label for="endpointUrl">Adres endpointu</label>
+          <input id="endpointUrl" type="url" placeholder="Wklej adres web app z Apps Script" />
+        </div>
+        <div class="field">
+          <label for="roleSelect">Rola</label>
+          <select id="roleSelect">
+            <option value="admin">admin</option>
+            <option value="superadmin">superadmin</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="tokenInput">Token</label>
+          <input id="tokenInput" type="password" placeholder="Wklej token dla wybranej roli" />
+        </div>
+      </div>
+      <div class="button-row">
+        <button id="saveConnectionBtn" type="button">Zapamiętaj połączenie</button>
+        <button id="clearConnectionBtn" type="button">Wyczyść połączenie</button>
+        <button id="healthBtn" type="button">Sprawdź endpoint</button>
+        <button id="loadBtn" class="primary" type="button">Pobierz rekordy</button>
+        <button id="saveBtn" type="button">Zapisz wszystkie rekordy</button>
+      </div>
+      <div class="summary">
+        <p><strong>Rola aktywna:</strong> <span id="activeRole">admin</span></p>
+        <p id="roleHint" class="muted">Admin może czytać, porządkować i publikować pytania. Superadmin może dodatkowo usuwać rekordy i nadpisywać całą bazę.</p>
+      </div>
+      <div id="connectionLive" class="live" aria-live="polite"></div>
+      <div id="connectionError" class="error" aria-live="assertive"></div>
+    </section>
+
+    <section>
+      <h2>Rekordy</h2>
+      <div class="grid3">
+        <div class="field">
+          <label for="searchInput">Szukaj w treści</label>
+          <input id="searchInput" type="search" />
+        </div>
+        <div class="field">
+          <label for="categoryFilter">Kategoria</label>
+          <select id="categoryFilter"><option value="all">Wszystkie</option></select>
+        </div>
+        <div class="field">
+          <label for="statusFilter">Status</label>
+          <select id="statusFilter">
+            <option value="all">Wszystkie</option>
+            <option value="nowe">nowe</option>
+            <option value="do-sprawdzenia">do-sprawdzenia</option>
+            <option value="gotowe">gotowe</option>
+            <option value="aktywne">aktywne</option>
+            <option value="odrzucone">odrzucone</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="readyFilter">Gotowe redakcyjnie</label>
+          <select id="readyFilter">
+            <option value="all">Wszystkie</option>
+            <option value="tak">tak</option>
+            <option value="nie">nie</option>
+          </select>
+        </div>
+      </div>
+      <div class="button-row">
+        <button id="newBtn" type="button">Nowy rekord</button>
+        <button id="bulkReadyYesBtn" type="button">Ustaw gotowe redakcyjnie = tak</button>
+        <button id="bulkReadyNoBtn" type="button">Ustaw gotowe redakcyjnie = nie</button>
+        <button id="showGuestExportBtn" type="button">Pokaż eksport dla gościa</button>
+        <button id="downloadGuestExportBtn" type="button">Pobierz eksport dla gościa</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Status</th>
+              <th>Gotowe red.</th>
+              <th>Aktywne</th>
+              <th>Rdzeń</th>
+              <th>Kategoria</th>
+              <th>Treść</th>
+              <th>Autor</th>
+              <th>Źródło</th>
+              <th>Akcje</th>
+            </tr>
+          </thead>
+          <tbody id="recordsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="editorHeading" tabindex="-1">Edytor rekordu</h2>
+      <div id="emptyState" class="summary">Nie wybrano rekordu do edycji.</div>
+      <form id="editorForm" class="hidden">
+        <div class="grid3">
+          <div class="field"><label for="recId">ID</label><input id="recId" type="text" /></div>
+          <div class="field"><label for="recStatus">Status</label><select id="recStatus"><option value="nowe">nowe</option><option value="do-sprawdzenia">do-sprawdzenia</option><option value="gotowe">gotowe</option><option value="aktywne">aktywne</option><option value="odrzucone">odrzucone</option></select></div>
+          <div class="field"><label for="recSource">Źródło</label><input id="recSource" type="text" /></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label for="recAuthor">Autor</label><input id="recAuthor" type="text" /></div>
+          <div class="field"><label for="recVersion">Wersja</label><input id="recVersion" type="text" /></div>
+          <div class="field"><label for="recCategory">Kategoria</label><select id="recCategory"><option value="">Wybierz kategorię</option><option value="ciemność">ciemność</option><option value="światło">światło</option><option value="eksperymenty">eksperymenty</option><option value="womai">womai</option><option value="przewodnicy">przewodnicy</option></select></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label for="recType">Typ pytania</label><input id="recType" type="text" value="jednokrotny-wybor" /></div>
+          <div class="field"><label for="recChoiceCount">Liczba odpowiedzi</label><select id="recChoiceCount"><option value="2">2</option><option value="3">3</option></select></div>
+          <div class="field"><label for="recCorrect">Poprawna odpowiedź</label><select id="recCorrect"><option value="1">Odpowiedź 1</option><option value="2">Odpowiedź 2</option><option value="3">Odpowiedź 3</option></select></div>
+        </div>
+        <div class="field"><label for="recPrompt">Treść pytania</label><textarea id="recPrompt"></textarea></div>
+        <div class="field"><label for="recChoice1">Odpowiedź 1</label><input id="recChoice1" type="text" /></div>
+        <div class="field"><label for="recChoice2">Odpowiedź 2</label><input id="recChoice2" type="text" /></div>
+        <div class="field"><label for="recChoice3">Odpowiedź 3</label><input id="recChoice3" type="text" /></div>
+        <div class="field"><label for="recExplanation">Wyjaśnienie</label><textarea id="recExplanation"></textarea></div>
+        <div class="field"><label for="recNotes">Uwagi</label><textarea id="recNotes"></textarea></div>
+        <div class="grid3">
+          <div class="field"><label for="recReady">Gotowe redakcyjnie</label><select id="recReady"><option value="nie">nie</option><option value="tak">tak</option></select></div>
+          <div class="field"><label for="recActive">Aktywne</label><select id="recActive"><option value="nie">nie</option><option value="tak">tak</option></select></div>
+          <div class="field"><label for="recCore">Rdzeń</label><select id="recCore"><option value="nie">nie</option><option value="tak">tak</option></select></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label for="recCreated">Data dodania</label><input id="recCreated" type="text" /></div>
+          <div class="field"><label for="recUpdated">Data aktualizacji</label><input id="recUpdated" type="text" readonly /></div>
+        </div>
+        <div class="button-row">
+          <button id="saveRecordBtn" class="primary" type="submit">Zapisz rekord</button>
+          <button id="duplicateBtn" type="button">Duplikuj rekord</button>
+          <button id="deleteBtn" class="danger" type="button">Usuń rekord</button>
+          <button id="closeEditorBtn" type="button">Zamknij edycję</button>
+        </div>
+        <div id="editorLive" class="live" aria-live="polite"></div>
+        <div id="editorError" class="error" aria-live="assertive"></div>
+      </form>
+    </section>
+
+    <section>
+      <h2>Podgląd JSON</h2>
+      <div class="field"><label for="previewArea">Podgląd</label><textarea id="previewArea" readonly></textarea></div>
+    </section>
+  </main>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/admin.js"></script>
+</body>
+</html>
