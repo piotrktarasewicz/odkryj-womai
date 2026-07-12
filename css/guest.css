@@ -45,6 +45,7 @@ button[disabled] { opacity: .55; cursor: not-allowed; }
 .site-footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.95rem; }
 @media (max-width: 760px) {
   .start-options { grid-template-columns: 1fr; }
-  .brand-logo { width: 74px; }
+  .brand-mark { min-width: 142px; min-height: 66px; }
+  .brand-logo { width: 126px; max-height: 50px; }
   .card { padding: 20px; }
 }
