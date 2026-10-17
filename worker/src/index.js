@@ -1,9 +1,25 @@
-// Pośrednik między panelem administratora a Apps Script.
-// Rozpoznaje osobę po logowaniu Cloudflare Access, ustala jej rolę z listy
-// adresów e-mail i dokłada do zapytania właściwy token. Tokeny nie trafiają
-// do przeglądarki.
+// Pośrednik między stroną a Apps Script.
+//
+// 1. Panel administratora (/odkryj-womai/admin/api/…): rozpoznaje osobę po
+//    logowaniu Cloudflare Access, ustala jej rolę z listy adresów e-mail
+//    i dokłada do zapytania właściwy token. Tokeny nie trafiają do przeglądarki.
+// 2. Pytania dla gości (/odkryj-womai/api/guest): publiczna kopia akcji guest,
+//    trzymana kilka minut w pamięci Cloudflare, żeby duża grupa gości naraz
+//    nie przekroczyła limitu jednoczesnych wywołań Apps Script.
 
 const API_PREFIX = '/odkryj-womai/admin/api/';
+const GUEST_PATH = '/odkryj-womai/api/guest';
+
+// Jak długo kopia pytań jest uznawana za świeżą.
+const GUEST_FRESH_SECONDS = 5 * 60;
+// Jak długo trzymamy ostatnią dobrą kopię na wypadek awarii Apps Script.
+const GUEST_STALE_SECONDS = 30 * 24 * 60 * 60;
+const GUEST_UPSTREAM_TIMEOUT_MS = 8000;
+// Akcje, po których kopia pytań w tym centrum danych jest od razu odświeżana.
+const ACTIONS_CHANGING_QUESTIONS = ['upsertRecord', 'save', 'deleteRecord', 'dedupeRecords', 'syncFormResponses'];
+
+// Zapasowa ostatnia dobra kopia w pamięci instancji.
+let guestMemoryCopy = null;
 
 // Akcja panelu -> najniższa rola, która może ją wykonać.
 const ACTIONS = {
@@ -156,9 +172,116 @@ async function forwardToAppsScript(request, env, action, role) {
   });
 }
 
+function guestCacheKeys(requestUrl) {
+  const base = new URL(GUEST_PATH, requestUrl.origin).toString();
+  return {
+    fresh: new Request(base + '?copy=fresh', { method: 'GET' }),
+    stale: new Request(base + '?copy=last-good', { method: 'GET' })
+  };
+}
+
+function guestResponse(body, source, fetchedAt, method) {
+  return new Response(method === 'HEAD' ? null : body, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Womai-Source': source,
+      'X-Womai-Fetched-At': fetchedAt
+    }
+  });
+}
+
+function cacheEntry(body, fetchedAt, maxAge) {
+  return new Response(body, {
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'public, max-age=' + maxAge,
+      'X-Womai-Fetched-At': fetchedAt
+    }
+  });
+}
+
+// Pobiera akcję guest z Apps Script. Zwraca tekst JSON albo null, gdy
+// odpowiedź nie nadaje się do pokazania gościom.
+async function fetchGuestFromAppsScript(env) {
+  const url = new URL(env.APPS_SCRIPT_URL);
+  url.searchParams.set('action', 'guest');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GUEST_UPSTREAM_TIMEOUT_MS);
+  try {
+    const upstream = await fetch(url.toString(), {
+      headers: { 'Accept': 'application/json' },
+      signal: controller.signal
+    });
+    if (!upstream.ok) return null;
+    const text = await upstream.text();
+    const parsed = JSON.parse(text);
+    if (!parsed || parsed.ok !== true || !parsed.data || !Array.isArray(parsed.data.questions)) return null;
+    if (parsed.data.questions.length === 0) return null;
+    return text;
+  } catch (error) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function handleGuest(request, env, ctx, cache) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return json(405, { ok: false, error: 'Niedozwolona metoda.' });
+  }
+
+  const keys = guestCacheKeys(new URL(request.url));
+
+  const cached = await cache.match(keys.fresh);
+  if (cached) {
+    return guestResponse(await cached.text(), 'cache', cached.headers.get('X-Womai-Fetched-At') || '', request.method);
+  }
+
+  const body = await fetchGuestFromAppsScript(env);
+  if (body) {
+    const fetchedAt = new Date().toISOString();
+    guestMemoryCopy = { body, fetchedAt };
+    ctx.waitUntil(Promise.all([
+      cache.put(keys.fresh, cacheEntry(body, fetchedAt, GUEST_FRESH_SECONDS)),
+      cache.put(keys.stale, cacheEntry(body, fetchedAt, GUEST_STALE_SECONDS))
+    ]).catch(() => {}));
+    return guestResponse(body, 'apps-script', fetchedAt, request.method);
+  }
+
+  // Apps Script nie odpowiedział poprawnie: oddajemy ostatnią dobrą kopię.
+  const stale = await cache.match(keys.stale);
+  if (stale) {
+    return guestResponse(await stale.text(), 'last-good', stale.headers.get('X-Womai-Fetched-At') || '', request.method);
+  }
+  if (guestMemoryCopy) {
+    return guestResponse(guestMemoryCopy.body, 'last-good', guestMemoryCopy.fetchedAt, request.method);
+  }
+
+  return json(502, { ok: false, error: 'Nie udało się pobrać pytań z Apps Script.' });
+}
+
+// Po zmianie pytań w panelu kasuje świeżą kopię w tym centrum danych, żeby
+// osoba sprawdzająca quiz od razu zobaczyła zmianę. Ostatnia dobra kopia zostaje.
+async function forgetFreshGuestCopy(requestUrl, cache) {
+  try {
+    await cache.delete(guestCacheKeys(requestUrl).fresh);
+  } catch (error) {
+    // Bez znaczenia: kopia i tak wygaśnie po kilku minutach.
+  }
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const cache = globalThis.caches && caches.default;
+
+    if (url.pathname.replace(/\/+$/, '') === GUEST_PATH) {
+      return handleGuest(request, env, ctx, cache);
+    }
+
     if (!url.pathname.startsWith(API_PREFIX)) return json(404, { ok: false, error: 'Nie znaleziono.' });
     const action = url.pathname.slice(API_PREFIX.length).replace(/\/+$/, '');
 
@@ -187,6 +310,10 @@ export default {
       return json(403, { ok: false, error: 'Ta operacja wymaga roli superadmin.' });
     }
 
-    return forwardToAppsScript(request, env, action, role);
+    const response = await forwardToAppsScript(request, env, action, role);
+    if (response.ok && ACTIONS_CHANGING_QUESTIONS.includes(action)) {
+      ctx.waitUntil(forgetFreshGuestCopy(url, cache));
+    }
+    return response;
   }
 };

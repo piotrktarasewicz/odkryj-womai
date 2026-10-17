@@ -8,10 +8,13 @@ workers_dev = false
 # typ Text). Ta opcja sprawia, że wdrożenie ich nie kasuje.
 keep_vars = true
 
-# Worker obsługuje tylko API panelu administratora. Ta ścieżka leży pod
-# /odkryj-womai/admin/, więc chroni ją ta sama aplikacja Cloudflare Access.
+# Pierwsza trasa to API panelu administratora. Leży pod /odkryj-womai/admin/,
+# więc chroni ją ta sama aplikacja Cloudflare Access.
+# Druga trasa to publiczna kopia pytań dla gości. Celowo leży POZA
+# /odkryj-womai/admin/, bo goście nie logują się.
 routes = [
-  { pattern = "ptprojects.app/odkryj-womai/admin/api/*", zone_name = "ptprojects.app" }
+  { pattern = "ptprojects.app/odkryj-womai/admin/api/*", zone_name = "ptprojects.app" },
+  { pattern = "ptprojects.app/odkryj-womai/api/guest*", zone_name = "ptprojects.app" }
 ]
 
 [vars]

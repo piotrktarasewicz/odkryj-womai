@@ -78,18 +78,32 @@
     }
   }
 
+  async function fetchGuestFrom(url) {
+    const { response, json } = await fetchJsonWithTimeout(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    }, timeoutMs(config.guest));
+
+    if (!response.ok || !json || !json.ok || !json.data) {
+      throw new Error(json && json.error ? json.error : 'Nie udało się pobrać pytań.');
+    }
+
+    return json.data;
+  }
+
+  // Kolejność: kopia w Cloudflare, Apps Script bezpośrednio, plik zapasowy.
   async function getGuestData() {
-    try {
-      const { response, json } = await fetchJsonWithTimeout(endpointUrl('guest').toString(), {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-      }, timeoutMs(config.guest));
-
-      if (!response.ok || !json.ok || !json.data) {
-        throw new Error(json && json.error ? json.error : 'Nie udało się pobrać pytań.');
+    const cachedDataUrl = config.guest?.cachedDataUrl;
+    if (cachedDataUrl) {
+      try {
+        return await fetchGuestFrom(new URL(cachedDataUrl, window.location.href).toString());
+      } catch (error) {
+        // Przechodzimy do Apps Script.
       }
+    }
 
-      return json.data;
+    try {
+      return await fetchGuestFrom(endpointUrl('guest').toString());
     } catch (error) {
       return getGuestFallbackData(error);
     }

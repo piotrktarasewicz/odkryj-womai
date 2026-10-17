@@ -119,6 +119,18 @@ Dodanie lub usunięcie osoby wymaga zmiany listy w Workerze i polityki w Cloudfl
 
 Katalog `worker/` nie jest publikowany do `ptprojects`.
 
+## Pytania dla gości przez Cloudflare
+
+Apps Script obsługuje naraz około 30 wywołań, więc quiz nie pyta go przy każdym wejściu. Ten sam Worker ma publiczną ścieżkę `/odkryj-womai/api/guest` (bez logowania, poza `/odkryj-womai/admin/`):
+
+1. Worker oddaje kopię akcji `guest` z pamięci Cloudflare, jeśli ma nie starszą niż 5 minut.
+2. Inaczej pyta Apps Script i zapamiętuje odpowiedź.
+3. Gdy Apps Script nie odpowie poprawnie, Worker oddaje ostatnią dobrą kopię (trzymaną do 30 dni).
+
+Quiz (`js/api.js`) próbuje kolejno: tej ścieżki, Apps Script bezpośrednio, pliku `data/fallback-questions.json`.
+
+Zmiany pytań w panelu docierają do gości najpóźniej po około 5 minutach. Po zapisie w panelu Worker od razu kasuje świeżą kopię w centrum danych osoby, która zapisała, więc ona zwykle widzi zmianę od razu. Nagłówek `X-Womai-Source` w odpowiedzi mówi, skąd pochodzą pytania (`cache`, `apps-script`, `last-good`).
+
 ## Publikacja
 
 Docelowe publiczne adresy pozostają bez zmian:

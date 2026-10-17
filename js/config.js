@@ -2,6 +2,9 @@ window.WOMAI_CONFIG = {
   apiUrl: 'https://script.google.com/macros/s/AKfycbxjT94bgmFWki3G3uC-YxRg7udGUDSRWRMXcC2B3xSjOJTfVkx8bKUWCOnRfd6iHBPP/exec',
   requestTimeoutMs: 10000,
   guest: {
+    // Kopia pytań w Cloudflare (Worker). Gdy zawiedzie, quiz pyta Apps Script
+    // bezpośrednio, a na końcu wczytuje fallbackDataUrl.
+    cachedDataUrl: '/odkryj-womai/api/guest',
     sessionQuestionCountFallback: 4,
     categoryQuestionCounts: {
       'ciemność': 2,
