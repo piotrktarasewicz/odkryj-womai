@@ -15,7 +15,7 @@ routes = [
 ]
 
 [vars]
-APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw4DT_QBC8em-TEXhP7BeAiiFZDrZqzSpLeOuy9HziSqlEVqwWiTbMql1qi0uSsuZ9v/exec"
+APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxjT94bgmFWki3G3uC-YxRg7udGUDSRWRMXcC2B3xSjOJTfVkx8bKUWCOnRfd6iHBPP/exec"
 ACCESS_TEAM_DOMAIN = "womai.cloudflareaccess.com"
 ACCESS_AUD = "f87eca897045b309d2c8568be18b187f5548f99b6e4ed338b4d1758acb7983b3"
 
