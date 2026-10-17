@@ -63,7 +63,7 @@ Ten plik jest wczytywany w `odkryj-womai/index.html` przez element `img.brand-lo
 
 Plik `assets/logo-placeholder.svg` może pozostać jako techniczny placeholder lub zapas dla miejsc, które nie mają jeszcze docelowego logo.
 
-Panel administratora nadal używa klasy `brand-logo-placeholder`, więc jego nagłówek można później osobno dostosować do prawdziwego logo.
+Panel administratora pokazuje to samo logo (`assets/logo-womai-black.png`) na czarnym pasku. Jego kolory są w `css/admin.css` i korzystają z barw WOMAI: żółtego `#ffc814` i fioletu `#6b03ef`.
 
 ## Dostępność
 
@@ -80,6 +80,17 @@ Przy zmianach trzeba pilnować:
 ## Bezpieczeństwo
 
 Cloudflare chroni ścieżkę `/odkryj-womai/admin/`, ale backend Apps Script nadal musi sprawdzać token i rolę dla każdej operacji administracyjnej. Publiczne `action=guest` powinno zwracać wyłącznie dane przeznaczone dla gościa.
+
+## Panel administratora
+
+Panel zaczyna się od zadań („Do zrobienia”), a nie od tabeli. Każde pytanie ma jeden z czterech stanów, zapisywanych w kolumnach arkusza tak, jak wymaga tego `buildGuestPayload_` w Apps Script:
+
+- **W quizie**: `status = aktywne`, `gotowe_redakcyjnie = tak`, `aktywne = tak`,
+- **Do sprawdzenia**: `status = do-sprawdzenia`, oba pola `nie`,
+- **Odrzucone**: `status = odrzucone`, oba pola `nie`,
+- **Nieopublikowane**: pozostałe (np. `status = nowe` z formularza).
+
+Zmiany treści zapisuje przycisk „Zapisz”, a przyciski stanu („Opublikuj w quizie”, „Odrzuć” itd.) zapisują od razu, razem z niezapisaną treścią. Panel zapisuje zawsze jeden rekord (`upsertRecord`); pełnego nadpisania bazy (`save`) nie używa.
 
 ## Logowanie do panelu administratora
 

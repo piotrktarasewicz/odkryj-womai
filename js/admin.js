@@ -4,62 +4,70 @@
   const config = window.WOMAI_CONFIG || {};
   const api = window.WOMAI_API;
   const LEGACY_STORAGE_KEY = config.admin?.legacyStorageKey || 'womai_admin_v5_connection';
-  const state = { records: [], selectedId: null, role: null, email: '' };
+  const BASE_CATEGORIES = ['ciemność', 'światło', 'eksperymenty', 'womai', 'przewodnicy'];
+  const MIN_PER_CATEGORY = config.guest?.categoryQuestionCounts || {};
+  // Statusy, przy których serwer pokazuje pytanie gościom (buildGuestPayload_ w Apps Script).
+  const GUEST_STATUSES = ['nowe', 'gotowe', 'aktywne'];
+  const EDITABLE = ['kategoria', 'tresc_pytania', 'odpowiedz_1', 'odpowiedz_2', 'odpowiedz_3', 'poprawna_odpowiedz', 'wyjasnienie', 'uwagi', 'rdzen'];
+  const TYPED = ['tresc_pytania', 'odpowiedz_1', 'odpowiedz_2', 'odpowiedz_3', 'wyjasnienie', 'uwagi'];
 
-  const el = {
-    accountEmail: document.getElementById('accountEmail'), loadBtn: document.getElementById('loadBtn'), saveBtn: document.getElementById('saveBtn'),
-    activeRole: document.getElementById('activeRole'), roleHint: document.getElementById('roleHint'), connectionLive: document.getElementById('connectionLive'), connectionError: document.getElementById('connectionError'), statsBox: document.getElementById('statsBox'),
-    searchInput: document.getElementById('searchInput'), categoryFilter: document.getElementById('categoryFilter'), statusFilter: document.getElementById('statusFilter'), readyFilter: document.getElementById('readyFilter'),
-    newBtn: document.getElementById('newBtn'), bulkReadyYesBtn: document.getElementById('bulkReadyYesBtn'), bulkReadyNoBtn: document.getElementById('bulkReadyNoBtn'),
-    showGuestExportBtn: document.getElementById('showGuestExportBtn'), downloadGuestExportBtn: document.getElementById('downloadGuestExportBtn'), recordsBody: document.getElementById('recordsBody'), editorHeading: document.getElementById('editorHeading'), emptyState: document.getElementById('emptyState'), editorForm: document.getElementById('editorForm'),
-    recId: document.getElementById('recId'), recStatus: document.getElementById('recStatus'), recSource: document.getElementById('recSource'), recAuthor: document.getElementById('recAuthor'), recVersion: document.getElementById('recVersion'), recCategory: document.getElementById('recCategory'), recType: document.getElementById('recType'), recChoiceCount: document.getElementById('recChoiceCount'), recCorrect: document.getElementById('recCorrect'), recPrompt: document.getElementById('recPrompt'), recChoice1: document.getElementById('recChoice1'), recChoice2: document.getElementById('recChoice2'), recChoice3: document.getElementById('recChoice3'), recExplanation: document.getElementById('recExplanation'), recNotes: document.getElementById('recNotes'), recReady: document.getElementById('recReady'), recActive: document.getElementById('recActive'), recCore: document.getElementById('recCore'), recCreated: document.getElementById('recCreated'), recUpdated: document.getElementById('recUpdated'), duplicateBtn: document.getElementById('duplicateBtn'), deleteBtn: document.getElementById('deleteBtn'), closeEditorBtn: document.getElementById('closeEditorBtn'), editorLive: document.getElementById('editorLive'), editorError: document.getElementById('editorError'), previewArea: document.getElementById('previewArea')
+  const STATE_TEXT = {
+    new: 'Nieopublikowane. Goście go nie widzą.',
+    chk: 'Czeka na sprawdzenie. Goście go nie widzą.',
+    pub: 'Opublikowane w quizie.',
+    rej: 'Odrzucone. Goście go nie widzą.'
+  };
+  const BADGE = {
+    new: ['Nieopublikowane', 'badge-new'],
+    chk: ['Do sprawdzenia', 'badge-chk'],
+    pub: ['W quizie', 'badge-pub'],
+    rej: ['Odrzucone', 'badge-rej']
+  };
+  // Jak każda czynność zapisuje się w kolumnach arkusza.
+  const FLAGS = {
+    publish: { status: 'aktywne', gotowe_redakcyjnie: 'tak', aktywne: 'tak' },
+    hold: { status: 'do-sprawdzenia', gotowe_redakcyjnie: 'nie', aktywne: 'nie' },
+    reject: { status: 'odrzucone', gotowe_redakcyjnie: 'nie', aktywne: 'nie' },
+    restore: { status: 'nowe', gotowe_redakcyjnie: 'nie', aktywne: 'nie' }
   };
 
-  function nowIso() { return new Date().toISOString(); }
-  function esc(v) { return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/'/g, '&#039;'); }
-  function slug(v) { return String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'pytanie'; }
-  function say(text) { el.connectionError.textContent = ''; el.connectionLive.textContent = ''; requestAnimationFrame(() => { el.connectionLive.textContent = text; }); }
-  function sayError(text) { el.connectionLive.textContent = ''; el.connectionError.textContent = ''; requestAnimationFrame(() => { el.connectionError.textContent = text; }); }
-  function sayEditor(text) { el.editorError.textContent = ''; el.editorLive.textContent = ''; requestAnimationFrame(() => { el.editorLive.textContent = text; }); }
-  function sayEditorError(text) { el.editorLive.textContent = ''; el.editorError.textContent = ''; requestAnimationFrame(() => { el.editorError.textContent = text; }); }
-  function currentRole() { return state.role; }
-  function isSuperadmin() { return currentRole() === 'superadmin'; }
+  const state = {
+    role: null, email: '', records: [], loaded: false,
+    view: 'home', returnView: 'home', filter: 'all', search: '',
+    current: null, draft: null, isNew: false, queue: null, queueIndex: 0,
+    busy: false, sync: null, dedupe: null, preview: false
+  };
 
-  function updateRoleUi() {
-    el.activeRole.textContent = currentRole() || '—';
-    el.roleHint.textContent = !currentRole() ? ''
-      : isSuperadmin()
-        ? 'Superadmin może czytać, edytować wszystko, usuwać rekordy i nadpisywać bazę.'
-        : 'Admin może czytać, porządkować i publikować pytania, ale nie usuwa rekordów i nie zmienia pełnej struktury bazy.';
-    el.loadBtn.disabled = !currentRole();
-    el.saveBtn.hidden = !isSuperadmin();
-    el.deleteBtn.disabled = !isSuperadmin();
-    el.recId.readOnly = !isSuperadmin();
-    el.recSource.readOnly = !isSuperadmin();
-    el.recCreated.readOnly = !isSuperadmin();
-    el.recVersion.readOnly = !isSuperadmin();
+  const view = document.getElementById('view');
+  const notice = document.getElementById('notice');
+  const account = document.getElementById('account');
+  const toolsTab = document.getElementById('toolsTab');
+
+  // ---------- Pomocnicze ----------
+
+  function esc(v) { return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
+  function low(v) { return String(v ?? '').trim().toLowerCase(); }
+  function yes(v) { return low(v) === 'tak'; }
+  function copy(v) { return JSON.parse(JSON.stringify(v)); }
+  function isSuperadmin() { return state.role === 'superadmin'; }
+  function plural(n, one, few, many) {
+    if (n === 1) return one;
+    const last = n % 10, lastTwo = n % 100;
+    return (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) ? few : many;
+  }
+  function questions(n) { return n + ' ' + plural(n, 'pytanie', 'pytania', 'pytań'); }
+  function formatDate(v) {
+    const d = new Date(v);
+    return v && !isNaN(d.getTime()) ? d.toLocaleString('pl-PL', { dateStyle: 'medium', timeStyle: 'short' }) : (v || '—');
   }
 
-  async function requestJson(method, action, body) {
-    return api.requestAdminJson(method, action, body);
-  }
-
-  // Cloudflare Access już zalogował osobę, Worker zwraca jej e-mail i rolę.
-  async function signIn() {
-    // Panel nie przechowuje już adresu endpointu ani tokenu w przeglądarce.
-    try { localStorage.removeItem(LEGACY_STORAGE_KEY); } catch (error) {}
-    try {
-      const json = await requestJson('GET', 'me');
-      state.email = json.email;
-      state.role = json.role;
-      el.accountEmail.textContent = json.email;
-      updateRoleUi();
-      await loadRecords();
-    } catch (error) {
-      el.accountEmail.textContent = 'nie rozpoznano';
-      updateRoleUi();
-      sayError(error.message);
-    }
+  // Treść wstawiana z opóźnieniem, żeby czytnik ekranu ogłosił ją ponownie.
+  let noticeTimer = 0;
+  function setNotice(text, kind) {
+    window.clearTimeout(noticeTimer);
+    notice.className = 'notice' + (text ? ' ' + (kind || 'ok') : '');
+    notice.textContent = '';
+    if (text) noticeTimer = window.setTimeout(() => { notice.textContent = text; }, 30);
   }
 
   function toRecordShape(raw) {
@@ -69,147 +77,471 @@
   }
 
   function blankRecord() {
-    const now = nowIso();
-    return { id: 'pytanie-' + Date.now().toString(36), data_dodania: now, data_aktualizacji: now, autor: '', zrodlo: 'ręczne', wersja: '1', kategoria: '', typ_pytania: 'jednokrotny-wybor', tresc_pytania: '', odpowiedz_1: '', odpowiedz_2: '', odpowiedz_3: '', liczba_odpowiedzi: '3', poprawna_odpowiedz: '1', wyjasnienie: '', uwagi: '', status: 'nowe', gotowe_redakcyjnie: 'nie', aktywne: 'nie', rdzen: 'nie' };
+    const now = new Date().toISOString();
+    return toRecordShape({ id: 'pytanie-' + Date.now().toString(36), data_dodania: now, data_aktualizacji: now, autor: isSuperadmin() ? state.email : '', zrodlo: 'panel', status: 'nowe', liczba_odpowiedzi: '2' });
   }
 
-  function filteredRecords() {
-    const search = el.searchInput.value.trim().toLowerCase();
-    const category = el.categoryFilter.value;
-    const status = el.statusFilter.value;
-    const ready = el.readyFilter.value;
-    return state.records.filter((record) => {
-      if (category !== 'all' && record.kategoria !== category) return false;
-      if (status !== 'all' && record.status !== status) return false;
-      if (ready !== 'all' && record.gotowe_redakcyjnie !== ready) return false;
-      if (search && !record.tresc_pytania.toLowerCase().includes(search)) return false;
-      return true;
-    });
+  // ---------- Stan pytania (te same reguły co serwer) ----------
+
+  function stateOf(r) {
+    const status = low(r.status);
+    if (status === 'odrzucone') return 'rej';
+    if (status === 'do-sprawdzenia') return 'chk';
+    if (yes(r.aktywne) && yes(r.gotowe_redakcyjnie)) return 'pub';
+    return 'new';
   }
 
-  function renderStats() {
-    const total = state.records.length;
-    const active = state.records.filter(r => r.aktywne === 'tak').length;
-    const core = state.records.filter(r => r.rdzen === 'tak').length;
-    const ready = state.records.filter(r => r.gotowe_redakcyjnie === 'tak').length;
-    el.statsBox.innerHTML = '<p><strong>Rekordy:</strong> ' + total + ' &nbsp; <strong>Gotowe red.:</strong> ' + ready + ' &nbsp; <strong>Aktywne:</strong> ' + active + ' &nbsp; <strong>Rdzeń:</strong> ' + core + '</p>';
+  function answersOf(r) {
+    return [r.odpowiedz_1, r.odpowiedz_2, r.odpowiedz_3].filter((a) => String(a || '').trim() !== '');
   }
 
-  function refreshCategoryFilter() {
-    const current = el.categoryFilter.value;
-    const categories = Array.from(new Set(state.records.map(r => r.kategoria).filter(Boolean))).sort();
-    el.categoryFilter.innerHTML = '<option value="all">Wszystkie</option>';
-    categories.forEach((category) => {
-      const option = document.createElement('option');
-      option.value = category;
-      option.textContent = category;
-      el.categoryFilter.appendChild(option);
-    });
-    el.categoryFilter.value = categories.includes(current) ? current : 'all';
+  // Powody, dla których gość nie zobaczy pytania mimo publikacji.
+  function problems(r) {
+    const list = [];
+    if (!String(r.tresc_pytania || '').trim()) list.push('brak treści pytania');
+    const count = answersOf(r).length;
+    if (count < 2) list.push('mniej niż dwie odpowiedzi');
+    const correct = Number(r.poprawna_odpowiedz) - 1;
+    if (count >= 2 && !(correct >= 0 && correct < count)) list.push('nie zaznaczono poprawnej odpowiedzi');
+    if (!String(r.wyjasnienie || '').trim()) list.push('brak wyjaśnienia po odpowiedzi');
+    if (!GUEST_STATUSES.includes(low(r.status)) && stateOf(r) === 'pub') list.push('nieprawidłowy status w arkuszu');
+    return list;
   }
 
-  function renderTable() {
-    refreshCategoryFilter();
-    renderStats();
-    const records = filteredRecords();
-    el.recordsBody.innerHTML = '';
-    if (!records.length) {
-      el.recordsBody.innerHTML = '<tr><td colspan="10">Brak rekordów.</td></tr>';
-      return;
-    }
-    records.forEach((record) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = '<td>' + esc(record.id) + '</td>' + '<td><span class="pill">' + esc(record.status) + '</span></td>' + '<td>' + esc(record.gotowe_redakcyjnie) + '</td>' + '<td>' + esc(record.aktywne) + '</td>' + '<td>' + esc(record.rdzen) + '</td>' + '<td>' + esc(record.kategoria || '—') + '</td>' + '<td>' + esc(record.tresc_pytania || '—') + '</td>' + '<td>' + esc(record.autor || '—') + '</td>' + '<td>' + esc(record.zrodlo || '—') + '</td>' + '<td class="actions-col"><button type="button" data-edit="' + esc(record.id) + '">Edytuj</button><button type="button" data-toggle-ready="' + esc(record.id) + '">' + (record.gotowe_redakcyjnie === 'tak' ? 'Ustaw niegotowe' : 'Ustaw gotowe') + '</button><button type="button" data-toggle-active="' + esc(record.id) + '">' + (record.aktywne === 'tak' ? 'Dezaktywuj' : 'Aktywuj') + '</button><button type="button" data-toggle-core="' + esc(record.id) + '">' + (record.rdzen === 'tak' ? 'Wyłącz rdzeń' : 'Włącz rdzeń') + '</button></td>';
-      el.recordsBody.appendChild(tr);
-    });
+  function isVisible(r) {
+    return stateOf(r) === 'pub' && problems(r).length === 0;
   }
 
-  function openEditor(id) {
-    const record = state.records.find((item) => item.id === id);
-    if (!record) return;
-    state.selectedId = id;
-    el.emptyState.classList.add('hidden');
-    el.editorForm.classList.remove('hidden');
-    el.recId.value = record.id; el.recStatus.value = record.status; el.recSource.value = record.zrodlo; el.recAuthor.value = record.autor; el.recVersion.value = record.wersja; el.recCategory.value = record.kategoria; el.recType.value = record.typ_pytania; el.recChoiceCount.value = record.liczba_odpowiedzi; el.recCorrect.value = record.poprawna_odpowiedz; el.recPrompt.value = record.tresc_pytania; el.recChoice1.value = record.odpowiedz_1; el.recChoice2.value = record.odpowiedz_2; el.recChoice3.value = record.odpowiedz_3; el.recExplanation.value = record.wyjasnienie; el.recNotes.value = record.uwagi; el.recReady.value = record.gotowe_redakcyjnie; el.recActive.value = record.aktywne; el.recCore.value = record.rdzen; el.recCreated.value = record.data_dodania; el.recUpdated.value = record.data_aktualizacji;
-    updateRoleUi();
-    requestAnimationFrame(() => el.editorHeading.focus());
+  function categories() {
+    const found = state.records.map((r) => r.kategoria).filter(Boolean);
+    return Array.from(new Set(BASE_CATEGORIES.concat(found)));
   }
 
-  function closeEditor() {
-    state.selectedId = null;
-    el.editorForm.classList.add('hidden');
-    el.emptyState.classList.remove('hidden');
+  function tasks() {
+    const byDate = (a, b) => String(a.data_dodania).localeCompare(String(b.data_dodania));
+    return [
+      { key: 'new', title: 'Nowe, jeszcze nieopublikowane', text: 'Przeczytaj, popraw i zdecyduj: do quizu czy nie.', ids: state.records.filter((r) => stateOf(r) === 'new').sort(byDate).map((r) => r.id) },
+      { key: 'chk', title: 'Czekają na sprawdzenie', text: 'Pytania odłożone wcześniej do ponownego przejrzenia.', ids: state.records.filter((r) => stateOf(r) === 'chk').sort(byDate).map((r) => r.id) },
+      { key: 'fix', title: 'Opublikowane, ale goście ich nie widzą', text: 'Czegoś brakuje, np. wyjaśnienia po odpowiedzi.', ids: state.records.filter((r) => stateOf(r) === 'pub' && !isVisible(r)).map((r) => r.id) }
+    ];
   }
 
-  function collectEditorRecord() {
-    const existing = state.records.find((item) => item.id === state.selectedId) || blankRecord();
-    const now = nowIso();
-    return { ...existing, id: el.recId.value.trim() || existing.id, data_dodania: el.recCreated.value.trim() || existing.data_dodania || now, data_aktualizacji: now, autor: el.recAuthor.value.trim(), zrodlo: el.recSource.value.trim() || 'ręczne', wersja: el.recVersion.value.trim() || '1', kategoria: el.recCategory.value.trim(), typ_pytania: el.recType.value.trim() || 'jednokrotny-wybor', tresc_pytania: el.recPrompt.value.trim(), odpowiedz_1: el.recChoice1.value.trim(), odpowiedz_2: el.recChoice2.value.trim(), odpowiedz_3: el.recChoiceCount.value === '2' ? '' : el.recChoice3.value.trim(), liczba_odpowiedzi: el.recChoiceCount.value, poprawna_odpowiedz: el.recCorrect.value, wyjasnienie: el.recExplanation.value.trim(), uwagi: el.recNotes.value.trim(), status: el.recStatus.value, gotowe_redakcyjnie: el.recReady.value, aktywne: el.recActive.value, rdzen: el.recCore.value };
+  // ---------- Komunikacja z serwerem ----------
+
+  async function requestJson(method, action, body) {
+    return api.requestAdminJson(method, action, body);
   }
 
   async function loadRecords() {
+    const json = await requestJson('GET', 'records');
+    state.records = (json.records || []).map(toRecordShape);
+    state.loaded = true;
+  }
+
+  async function loadSyncStatus() {
+    if (!isSuperadmin()) return;
     try {
-      const json = await requestJson('GET', 'records');
-      state.records = (json.records || []).map(toRecordShape);
-      renderTable();
-      closeEditor();
-      say('Pobrano rekordy.');
-    } catch (error) { sayError(error.message); }
+      const json = await requestJson('GET', 'syncStatus');
+      state.sync = json.sync || null;
+    } catch (error) {
+      state.sync = { error: error.message };
+    }
+    if (state.view === 'home' || state.view === 'tools') render();
   }
 
-  async function saveAllRecords() {
+  async function signIn() {
+    // Panel nie przechowuje już adresu endpointu ani tokenu w przeglądarce.
+    try { localStorage.removeItem(LEGACY_STORAGE_KEY); } catch (error) {}
+    view.innerHTML = '<p class="loading">Wczytywanie pytań…</p>';
     try {
-      if (!isSuperadmin()) return sayError('Pełny zapis całej bazy jest dostępny tylko dla superadmina.');
-      await requestJson('POST', 'save', { records: state.records });
-      say('Zapisano wszystkie rekordy.');
-    } catch (error) { sayError(error.message); }
+      const me = await requestJson('GET', 'me');
+      state.email = me.email;
+      state.role = me.role;
+      account.textContent = me.email + ' · ' + (isSuperadmin() ? 'superadmin' : 'admin');
+      toolsTab.hidden = !isSuperadmin();
+      await loadRecords();
+      render();
+      loadSyncStatus();
+    } catch (error) {
+      account.textContent = 'Nie rozpoznano konta';
+      view.innerHTML = '';
+      setNotice(error.message, 'bad');
+    }
   }
 
-  async function saveCurrentRecord(event) {
-    event.preventDefault();
+  // ---------- Widoki ----------
+
+  function render(focusHeading) {
+    document.querySelectorAll('.tab').forEach((tab) => {
+      const active = tab.dataset.view === (state.view === 'edit' ? state.returnView : state.view);
+      if (active) tab.setAttribute('aria-current', 'page'); else tab.removeAttribute('aria-current');
+    });
+    if (!state.loaded) return;
+    if (state.view === 'home') renderHome();
+    else if (state.view === 'all') renderAll();
+    else if (state.view === 'tools') renderTools();
+    else renderEditor();
+    if (focusHeading) {
+      const heading = view.querySelector('h2');
+      if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus(); }
+    }
+  }
+
+  function renderHome() {
+    const cats = categories().filter((c) => MIN_PER_CATEGORY[c] || state.records.some((r) => r.kategoria === c && isVisible(r)));
+    const visible = state.records.filter(isVisible);
+    const core = visible.filter((r) => yes(r.rdzen)).length;
+
+    let html = '<h2>Do zrobienia</h2><div class="stats">';
+    cats.forEach((c) => {
+      const n = visible.filter((r) => r.kategoria === c).length;
+      const min = Number(MIN_PER_CATEGORY[c] || 0);
+      html += '<div class="stat"><div class="stat-label">W quizie · ' + esc(c) + '</div><div class="stat-value">' + questions(n) + '</div>' +
+        (min && n < min ? '<div class="small hint-warn">Za mało: quiz potrzebuje co najmniej ' + min + '.</div>' : '') + '</div>';
+    });
+    html += '<div class="stat"><div class="stat-label">Pytania podstawowe</div><div class="stat-value">' + core + ' z ' + visible.length + '</div>' +
+      '<div class="small muted">' + (visible.length && core === visible.length ? 'Wszystkie opublikowane są podstawowe.' : 'Quiz losuje najpierw z podstawowych.') + '</div></div>';
+    html += '</div>';
+
+    if (isSuperadmin()) html += importCard(true);
+
+    tasks().forEach((t) => {
+      html += '<div class="card task"><div><h3>' + esc(t.title) + ' <span class="muted">(' + t.ids.length + ')</span></h3><p class="muted small">' + (t.ids.length ? esc(t.text) : 'Nic do zrobienia.') + '</p></div>' +
+        (t.ids.length ? '<button type="button" class="btn btn-primary" data-action="start" data-task="' + t.key + '">Przejrzyj po kolei</button>' : '<span class="task-done">Gotowe</span>') + '</div>';
+    });
+    view.innerHTML = html;
+  }
+
+  function importCard(compact) {
+    const sync = state.sync;
+    if (compact && sync && !sync.error && !sync.pendingResponses) return '';
+    let body;
+    if (!sync) body = '<p class="muted small">Sprawdzanie formularza…</p>';
+    else if (sync.error) body = '<p class="small hint-warn">Nie udało się sprawdzić formularza: ' + esc(sync.error) + '</p>';
+    else if (!sync.pendingResponses) body = '<p class="muted small">Brak nowych zgłoszeń. Przeniesiono już ' + questions(sync.importedResponses || 0) + '.</p>';
+    else body = '<p class="small">Czeka ' + questions(sync.pendingResponses) + ' z formularza. Po przeniesieniu znajdziesz je w „Nowe, jeszcze nieopublikowane”. Powtórzone pytania zostaną pominięte.</p>';
+
+    const button = sync && sync.pendingResponses
+      ? '<button type="button" class="btn btn-primary" data-action="import">Przenieś do panelu</button>'
+      : (compact ? '' : '<button type="button" class="btn" data-action="refresh-sync">Sprawdź ponownie</button>');
+    return '<div class="card task"><div><h3>Nowe zgłoszenia z formularza</h3>' + body + '</div>' + button + '</div>';
+  }
+
+  function renderAll() {
+    const counts = { all: state.records.length, new: 0, chk: 0, pub: 0, rej: 0 };
+    state.records.forEach((r) => { counts[stateOf(r)] += 1; });
+    const chips = [['all', 'Wszystkie'], ['new', 'Nieopublikowane'], ['chk', 'Do sprawdzenia'], ['pub', 'W quizie'], ['rej', 'Odrzucone']];
+    view.innerHTML = '<h2>Wszystkie pytania</h2>' +
+      '<div class="toolbar"><label class="visually-hidden" for="search">Szukaj w treści pytań</label><input id="search" type="search" placeholder="Szukaj w treści pytań" value="' + esc(state.search) + '" />' +
+      '<button type="button" class="btn btn-primary" data-action="new">Dodaj pytanie</button></div>' +
+      '<div class="chips" role="group" aria-label="Pokaż pytania">' + chips.map(([k, t]) => '<button type="button" class="chip" data-action="filter" data-filter="' + k + '" aria-pressed="' + (state.filter === k) + '">' + t + ' (' + counts[k] + ')</button>').join('') + '</div>' +
+      '<div id="listArea"></div>';
+    renderList();
+  }
+
+  function renderList() {
+    const area = document.getElementById('listArea');
+    if (!area) return;
+    const search = low(state.search);
+    const items = state.records.filter((r) => (state.filter === 'all' || stateOf(r) === state.filter) && (!search || low(r.tresc_pytania).includes(search)));
+    if (!items.length) { area.innerHTML = '<p class="muted">Brak pytań do pokazania.</p>'; return; }
+    area.innerHTML = '<ul class="list">' + items.map((r) => {
+      const s = stateOf(r), issues = s === 'pub' ? problems(r) : [];
+      return '<li><button type="button" class="list-item" data-action="open" data-id="' + esc(r.id) + '"><span><span class="list-title">' + esc(r.tresc_pytania || '(bez treści)') + '</span><br>' +
+        '<span class="small muted">' + esc(r.kategoria || 'bez kategorii') + (yes(r.rdzen) ? ' · podstawowe' : '') + '</span>' +
+        (issues.length ? '<br><span class="small hint-warn">Goście go nie widzą: ' + esc(issues.join(', ')) + '.</span>' : '') +
+        '</span><span class="badge ' + BADGE[s][1] + '">' + BADGE[s][0] + '</span></button></li>';
+    }).join('') + '</ul>';
+  }
+
+  function renderTools() {
+    let html = '<h2>Narzędzia</h2>' + importCard(false);
+
+    html += '<div class="card"><h3>Powtórzone pytania</h3><p class="small">Szuka pytań o tej samej treści. Z każdej grupy zostaje najlepsza wersja (opublikowana, z wyjaśnieniem), pozostałe są usuwane z arkusza.</p>';
+    const d = state.dedupe;
+    if (!d) html += '<button type="button" class="btn" data-action="dedupe-preview">Sprawdź, czy są powtórzenia</button>';
+    else if (!d.duplicatesToRemove || !d.duplicatesToRemove.length) html += '<p class="task-done">Nie ma powtórzonych pytań.</p>';
+    else {
+      html += '<ul class="small">' + d.duplicateGroups.map((g) => '<li><strong>' + esc(g.question) + '</strong>: zostaje 1, do usunięcia ' + g.duplicateCount + '</li>').join('') + '</ul>' +
+        '<button type="button" class="btn btn-danger" data-action="dedupe-run">Usuń powtórzenia (' + d.duplicatesToRemove.length + ')</button> <span class="small muted">Tego nie da się cofnąć.</span>';
+    }
+    html += '</div>';
+
+    html += '<div class="card"><h3>Zapasowy zestaw pytań</h3><p class="small">Gdy serwer Google nie odpowiada, quiz korzysta z pliku <code>data/fallback-questions.json</code>. Ten przycisk pobiera aktualne pytania z quizu w tym formacie. Żeby zadziałały, plik trzeba podmienić w repozytorium.</p>' +
+      '<button type="button" class="btn" data-action="export">Pobierz plik</button></div>';
+    view.innerHTML = html;
+  }
+
+  function currentRecord() {
+    return state.isNew ? null : state.records.find((r) => r.id === state.current) || null;
+  }
+
+  function isDirty() {
+    if (!state.draft) return false;
+    if (state.isNew) return TYPED.some((k) => String(state.draft[k] || '').trim() !== '') || yes(state.draft.rdzen);
+    const original = currentRecord();
+    return !!original && EDITABLE.some((k) => String(state.draft[k] ?? '') !== String(original[k] ?? ''));
+  }
+
+  function renderEditor() {
+    const r = currentRecord() || state.draft;
+    const d = state.draft;
+    const s = state.isNew ? 'new' : stateOf(r);
+    const issues = s === 'pub' ? problems(r) : [];
+    const cats = categories();
+
+    let html = '<div class="editor-top"><button type="button" class="btn" data-action="back">← Wróć</button>' +
+      (state.queue ? '<span class="muted">Pytanie ' + (state.queueIndex + 1) + ' z ' + state.queue.length + '</span>' : '') + '</div>';
+
+    html += '<div class="card"><h2>' + (state.isNew ? 'Nowe pytanie' : 'Pytanie') + '</h2>' +
+      '<p class="muted">Teraz: <strong>' + (state.isNew ? 'Jeszcze niezapisane.' : STATE_TEXT[s]) + '</strong></p>' +
+      (issues.length ? '<div class="box-warn">Goście go nie widzą: ' + esc(issues.join(', ')) + '.</div>' : '');
+
+    html += '<div class="field"><label for="f-kategoria">Kategoria</label><select id="f-kategoria" data-field="kategoria"><option value="">Wybierz kategorię</option>' +
+      cats.map((c) => '<option value="' + esc(c) + '"' + (d.kategoria === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></div>';
+    html += '<div class="field"><label for="f-tresc">Treść pytania</label><textarea id="f-tresc" data-field="tresc_pytania">' + esc(d.tresc_pytania) + '</textarea></div>';
+    html += '<fieldset class="field fieldset"><legend class="label">Odpowiedzi</legend><p class="help">Zaznacz kółko przy poprawnej odpowiedzi. Trzecia odpowiedź jest nieobowiązkowa.</p><div class="answers">' +
+      [1, 2, 3].map((n) => '<div class="answer"><input type="radio" name="correct" id="f-ok-' + n + '" value="' + n + '" data-field="poprawna_odpowiedz"' + (String(d.poprawna_odpowiedz) === String(n) ? ' checked' : '') + ' aria-label="Odpowiedź ' + n + ' jest poprawna" />' +
+        '<input type="text" id="f-odp-' + n + '" data-field="odpowiedz_' + n + '" value="' + esc(d['odpowiedz_' + n]) + '" aria-label="Odpowiedź ' + n + '" placeholder="Odpowiedź ' + n + (n === 3 ? ' (nieobowiązkowa)' : '') + '" /></div>').join('') +
+      '</div></fieldset>';
+    html += '<div class="field"><label for="f-wyj">Wyjaśnienie po odpowiedzi</label><p class="help" id="h-wyj">Gość zobaczy je po udzieleniu odpowiedzi. Bez wyjaśnienia pytanie nie trafi do quizu.</p><textarea id="f-wyj" data-field="wyjasnienie" aria-describedby="h-wyj">' + esc(d.wyjasnienie) + '</textarea></div>';
+    html += '<div class="field"><div class="check"><input type="checkbox" id="f-rdzen" data-field="rdzen"' + (yes(d.rdzen) ? ' checked' : '') + ' aria-describedby="h-rdzen" /><div><label for="f-rdzen">Pytanie podstawowe</label><p class="help" id="h-rdzen">Quiz losuje najpierw z pytań podstawowych. Pozostałe pojawiają się, gdy podstawowych zabraknie.</p></div></div></div>';
+    html += '<div class="field"><label for="f-uwagi">Notatki wewnętrzne</label><p class="help" id="h-uwagi">Widzą je tylko osoby z dostępem do panelu.</p><textarea id="f-uwagi" data-field="uwagi" aria-describedby="h-uwagi">' + esc(d.uwagi) + '</textarea></div>';
+    html += '<p><button type="button" class="btn-link" data-action="preview" aria-expanded="' + state.preview + '">' + (state.preview ? 'Ukryj podgląd' : 'Pokaż, jak zobaczy to gość') + '</button></p><div id="previewArea"></div>';
+    html += '<div id="dirtyBar"></div>';
+    if (!state.isNew) {
+      html += '<details class="tech"><summary>Szczegóły techniczne</summary><dl>' +
+        '<dt>ID</dt><dd>' + esc(r.id) + '</dd><dt>Autor</dt><dd>' + esc(r.autor || '—') + '</dd><dt>Źródło</dt><dd>' + esc(r.zrodlo || '—') + '</dd>' +
+        '<dt>Dodano</dt><dd>' + esc(formatDate(r.data_dodania)) + '</dd><dt>Zmieniono</dt><dd>' + esc(formatDate(r.data_aktualizacji)) + '</dd>' +
+        '<dt>W arkuszu</dt><dd>status: ' + esc(r.status || '—') + ', gotowe: ' + esc(r.gotowe_redakcyjnie || '—') + ', aktywne: ' + esc(r.aktywne || '—') + '</dd></dl></details>';
+    }
+    html += '</div>';
+
+    html += '<div class="card"><h3>Co zrobić z tym pytaniem?</h3><div id="actionError" role="alert"></div><div class="actions">';
+    const act = (name, label, text, cls) => '<div class="action"><button type="button" class="btn ' + (cls || '') + '" data-action="' + name + '">' + label + '</button><span class="small muted"' + (name === 'publish' ? ' id="publishText"' : '') + '>' + text + '</span></div>';
+    if (s === 'pub' && !state.isNew) {
+      html += act('unpublish', 'Wycofaj z quizu', 'Zniknie z quizu, ale nie zostanie usunięte. Trafi do „Czekają na sprawdzenie”.');
+    } else if (s === 'rej') {
+      html += act('restore', 'Przywróć', 'Wróci do nieopublikowanych. Potem możesz je opublikować.');
+    } else {
+      html += act('publish', 'Opublikuj w quizie', 'Goście zobaczą je od razu.', 'btn-primary');
+      if (state.isNew) html += act('save', 'Zapisz bez publikowania', 'Pytanie trafi do „Nowe, jeszcze nieopublikowane”.');
+      if (s === 'new' && !state.isNew) html += act('hold', 'Odłóż do sprawdzenia', 'Wróci w zadaniach jako „Czekają na sprawdzenie”.');
+      if (!state.isNew) html += act('reject', 'Odrzuć', 'Nie trafi do quizu. Zostaje w arkuszu, można je przywrócić.');
+    }
+    html += '</div></div>';
+
+    if (isSuperadmin() && !state.isNew) {
+      html += '<div class="card"><h3>Usunięcie</h3><div class="action"><button type="button" class="btn btn-danger" data-action="delete">Usuń na zawsze</button><span class="small muted">Pytanie zniknie z arkusza. Tego nie da się cofnąć. Żeby tylko ukryć pytanie, użyj „Odrzuć”.</span></div></div>';
+    }
+
+    view.innerHTML = html;
+    updateDirtyUi();
+  }
+
+  function updateDirtyUi() {
+    const bar = document.getElementById('dirtyBar');
+    if (!bar) return;
+    const dirty = isDirty();
+    const show = dirty && !state.isNew;
+    if (show && !bar.firstChild) {
+      bar.innerHTML = '<div class="dirty-bar"><span>Masz niezapisane zmiany.</span><span class="buttons"><button type="button" class="btn" data-action="undo">Cofnij</button><button type="button" class="btn btn-primary" data-action="save">Zapisz</button></span></div>';
+    } else if (!show) {
+      bar.innerHTML = '';
+    }
+    const publishText = document.getElementById('publishText');
+    if (publishText) publishText.textContent = 'Goście zobaczą je od razu.' + (show ? ' Twoje zmiany zapiszą się razem z publikacją.' : '');
+    if (state.preview) renderPreview();
+  }
+
+  function renderPreview() {
+    const area = document.getElementById('previewArea');
+    if (!area) return;
+    if (!state.preview) { area.innerHTML = ''; return; }
+    const r = compactAnswers(state.draft);
+    const answers = answersOf(r);
+    area.innerHTML = '<div class="preview" aria-label="Podgląd pytania dla gościa"><div class="p-q">' + esc(r.tresc_pytania || '(brak treści pytania)') + '</div>' +
+      answers.map((a, i) => {
+        const ok = String(i + 1) === String(r.poprawna_odpowiedz);
+        return '<div class="p-c' + (ok ? ' ok' : '') + '">' + esc(a) + (ok ? ' <span class="small">(poprawna)</span>' : '') + '</div>';
+      }).join('') +
+      '<div class="p-e">' + esc(r.wyjasnienie || '(brak wyjaśnienia, gość nie zobaczy tego pytania)') + '</div></div>';
+  }
+
+  // ---------- Edycja i zapis ----------
+
+  // Puste odpowiedzi przesuwa na koniec, żeby numer poprawnej odpowiedzi
+  // zgadzał się z tym, jak liczy go serwer.
+  function compactAnswers(d) {
+    const r = copy(d);
+    const slots = [1, 2, 3].map((n) => ({ n, text: String(r['odpowiedz_' + n] || '').trim() })).filter((a) => a.text);
+    const correctIndex = slots.findIndex((a) => String(a.n) === String(r.poprawna_odpowiedz));
+    [1, 2, 3].forEach((n, i) => { r['odpowiedz_' + n] = slots[i] ? slots[i].text : ''; });
+    r.poprawna_odpowiedz = correctIndex >= 0 ? String(correctIndex + 1) : '';
+    r.liczba_odpowiedzi = String(Math.max(2, slots.length));
+    return r;
+  }
+
+  function openEditor(id, queue) {
+    const r = state.records.find((x) => x.id === id);
+    if (!r) return;
+    if (state.view !== 'edit') state.returnView = queue ? 'home' : state.view;
+    state.current = id;
+    state.isNew = false;
+    state.draft = copy(r);
+    state.queue = queue || null;
+    state.queueIndex = queue ? queue.indexOf(id) : 0;
+    state.view = 'edit';
+    render(true);
+  }
+
+  function openNew() {
+    if (state.view !== 'edit') state.returnView = state.view;
+    state.draft = blankRecord();
+    state.current = state.draft.id;
+    state.isNew = true;
+    state.queue = null;
+    state.view = 'edit';
+    render(true);
+  }
+
+  function confirmLeave() {
+    return state.view !== 'edit' || !isDirty() || window.confirm('Masz niezapisane zmiany w tym pytaniu. Wyjść bez zapisywania?');
+  }
+
+  function goTo(viewName, message, kind) {
+    state.view = viewName;
+    state.queue = null;
+    state.draft = null;
+    state.isNew = false;
+    state.preview = false;
+    setNotice(message || '', kind);
+    render(true);
+  }
+
+  function showActionError(text) {
+    const box = document.getElementById('actionError');
+    if (!box) return setNotice(text, 'bad');
+    box.innerHTML = '';
+    setTimeout(() => { box.innerHTML = '<div class="box-bad">' + esc(text) + '</div>'; }, 30);
+  }
+
+  async function saveRecord(flags) {
+    const base = state.isNew ? state.draft : (currentRecord() || {});
+    const record = { ...base, ...compactAnswers(state.draft), ...(flags || {}), id: base.id };
+    const json = await requestJson('POST', 'upsertRecord', { record });
+    const saved = toRecordShape(json.record || record);
+    const index = state.records.findIndex((r) => r.id === saved.id);
+    if (index >= 0) state.records[index] = saved; else state.records.unshift(saved);
+    state.current = saved.id;
+    state.isNew = false;
+    state.draft = copy(saved);
+    return saved;
+  }
+
+  function nextInQueue(message) {
+    if (state.queue && state.queueIndex + 1 < state.queue.length) {
+      setNotice(message);
+      openEditor(state.queue[state.queueIndex + 1], state.queue);
+      return;
+    }
+    goTo(state.queue ? 'home' : state.returnView, message + (state.queue ? ' To było ostatnie pytanie w tej grupie.' : ''));
+  }
+
+  async function runAction(action) {
+    if (state.busy || !state.draft) return;
+    const wasDirty = isDirty() && !state.isNew;
+    const done = (text) => (wasDirty ? 'Zapisano zmiany i ' + text : text.charAt(0).toUpperCase() + text.slice(1));
+    state.busy = true;
+    document.body.setAttribute('aria-busy', 'true');
     try {
-      const record = collectEditorRecord();
-      const json = await requestJson('POST', 'upsertRecord', { record });
-      const saved = toRecordShape(json.record || record);
-      const index = state.records.findIndex((item) => item.id === saved.id);
-      if (index >= 0) state.records[index] = saved;
-      else state.records.unshift(saved);
-      state.selectedId = saved.id;
-      renderTable();
-      openEditor(saved.id);
-      sayEditor('Zapisano rekord.');
-    } catch (error) { sayEditorError(error.message); }
+      if (action === 'save') {
+        const wasNew = state.isNew;
+        if (!String(state.draft.tresc_pytania || '').trim()) return showActionError('Wpisz treść pytania, zanim zapiszesz.');
+        await saveRecord();
+        setNotice(wasNew ? 'Zapisano nowe pytanie. Goście go jeszcze nie widzą.' : 'Zapisano zmiany. Stan pytania się nie zmienił.');
+        render();
+      } else if (action === 'publish') {
+        const check = problems({ ...compactAnswers(state.draft), ...FLAGS.publish });
+        if (!String(state.draft.kategoria || '').trim()) check.unshift('nie wybrano kategorii');
+        if (check.length) return showActionError('Nie można jeszcze opublikować: ' + check.join(', ') + '.');
+        await saveRecord(FLAGS.publish);
+        nextInQueue(done('opublikowano. Pytanie jest już w quizie.'));
+      } else if (action === 'unpublish') {
+        await saveRecord(FLAGS.hold);
+        setNotice(done('wycofano z quizu. Pytanie czeka na sprawdzenie.'));
+        render();
+      } else if (action === 'hold') {
+        await saveRecord(FLAGS.hold);
+        nextInQueue(done('odłożono do sprawdzenia.'));
+      } else if (action === 'reject') {
+        await saveRecord(FLAGS.reject);
+        nextInQueue(done('odrzucono. Pytanie zostaje w arkuszu, można je przywrócić.'));
+      } else if (action === 'restore') {
+        await saveRecord(FLAGS.restore);
+        setNotice(done('przywrócono. Pytanie jest teraz nieopublikowane.'));
+        render();
+      } else if (action === 'delete') {
+        if (!window.confirm('Usunąć to pytanie na zawsze? Tego nie da się cofnąć.')) return;
+        await requestJson('POST', 'deleteRecord', { id: state.current });
+        state.records = state.records.filter((r) => r.id !== state.current);
+        goTo(state.returnView, 'Usunięto pytanie z arkusza.');
+      }
+    } catch (error) {
+      showActionError('Nie zapisano. ' + error.message);
+    } finally {
+      state.busy = false;
+      document.body.removeAttribute('aria-busy');
+    }
   }
 
-  async function deleteCurrentRecord() {
+  async function runTool(action) {
+    if (state.busy) return;
+    state.busy = true;
+    document.body.setAttribute('aria-busy', 'true');
     try {
-      if (!isSuperadmin()) return sayEditorError('Usuwanie rekordów jest dostępne tylko dla superadmina.');
-      const id = state.selectedId;
-      if (!id) return sayEditorError('Nie wybrano rekordu.');
-      await requestJson('POST', 'deleteRecord', { id });
-      state.records = state.records.filter((item) => item.id !== id);
-      renderTable();
-      closeEditor();
-      sayEditor('Usunięto rekord.');
-    } catch (error) { sayEditorError(error.message); }
+      if (action === 'import') {
+        const json = await requestJson('GET', 'syncFormResponses');
+        const sync = json.sync || {};
+        await loadRecords();
+        state.sync = null;
+        let text = 'Przeniesiono ' + questions(sync.imported || 0) + ' z formularza.';
+        if (sync.duplicatesSkipped) text += ' Pominięto powtórzone: ' + sync.duplicatesSkipped + '.';
+        if (sync.errors && sync.errors.length) text += ' Nie udało się przenieść ' + sync.errors.length + ' (wiersze formularza: ' + sync.errors.map((e) => e.row).join(', ') + ').';
+        setNotice(text, sync.errors && sync.errors.length ? 'bad' : 'ok');
+        render();
+        loadSyncStatus();
+      } else if (action === 'refresh-sync') {
+        state.sync = null;
+        render();
+        await loadSyncStatus();
+      } else if (action === 'dedupe-preview') {
+        const json = await requestJson('GET', 'dedupePreview');
+        state.dedupe = json.dedupe || {};
+        render();
+      } else if (action === 'dedupe-run') {
+        if (!window.confirm('Usunąć powtórzone pytania? Tego nie da się cofnąć.')) return;
+        const json = await requestJson('GET', 'dedupeRecords');
+        await loadRecords();
+        state.dedupe = null;
+        setNotice('Usunięto powtórzenia: ' + ((json.dedupe && json.dedupe.removed) || 0) + '.');
+        render();
+      }
+    } catch (error) {
+      setNotice(error.message, 'bad');
+    } finally {
+      state.busy = false;
+      document.body.removeAttribute('aria-busy');
+    }
   }
 
-  function createNewRecord() {
-    const record = blankRecord();
-    state.records.unshift(record);
-    renderTable();
-    openEditor(record.id);
-    say('Dodano nowy rekord lokalnie.');
-  }
-
-  function duplicateCurrentRecord() {
-    const current = state.records.find((item) => item.id === state.selectedId);
-    if (!current) return sayEditorError('Nie wybrano rekordu.');
-    const copy = { ...current, id: slug(current.kategoria || 'pytanie') + '-' + Date.now().toString(36), data_dodania: nowIso(), data_aktualizacji: nowIso(), aktywne: 'nie', rdzen: 'nie', status: 'nowe' };
-    state.records.unshift(copy);
-    renderTable();
-    openEditor(copy.id);
-    sayEditor('Utworzono duplikat rekordu.');
+  function guestExport() {
+    const visible = state.records.filter(isVisible);
+    return {
+      settings: { corePoolSize: visible.filter((r) => yes(r.rdzen)).length, sessionQuestionCount: 4 },
+      categories: Array.from(new Set(visible.map((r) => r.kategoria).filter(Boolean))).map((c) => ({ id: c, label: c, active: true })),
+      questions: visible.map((r) => ({ id: r.id, categoryId: r.kategoria, prompt: r.tresc_pytania, choices: answersOf(r).map((text, i) => ({ id: ['a', 'b', 'c'][i], text })), correctChoiceId: ['a', 'b', 'c'][Math.max(0, Number(r.poprawna_odpowiedz) - 1)] || 'a', explanation: r.wyjasnienie, active: true, isCore: yes(r.rdzen) }))
+    };
   }
 
   function downloadJson(filename, data) {
@@ -224,66 +556,74 @@
     URL.revokeObjectURL(url);
   }
 
-  function guestExport() {
-    const active = state.records.filter((record) => record.aktywne === 'tak' && record.gotowe_redakcyjnie === 'tak' && record.tresc_pytania.trim() !== '' && record.wyjasnienie.trim() !== '' && [record.odpowiedz_1, record.odpowiedz_2, record.odpowiedz_3].filter(Boolean).length >= 2);
-    const categories = Array.from(new Set(active.map((record) => record.kategoria).filter(Boolean)));
-    return {
-      settings: { corePoolSize: active.filter((record) => record.rdzen === 'tak').length, sessionQuestionCount: 4 },
-      categories: categories.map((category) => ({ id: category, label: category, active: true })),
-      questions: active.map((record) => ({ id: record.id, categoryId: record.kategoria, prompt: record.tresc_pytania, choices: [record.odpowiedz_1, record.odpowiedz_2, record.odpowiedz_3].filter(Boolean).map((text, index) => ({ id: ['a','b','c'][index], text })), correctChoiceId: ['a','b','c'][Math.max(0, Number(record.poprawna_odpowiedz) - 1)] || 'a', explanation: record.wyjasnienie, active: true, isCore: record.rdzen === 'tak' }))
-    };
+  // ---------- Zdarzenia ----------
+
+  document.addEventListener('click', function (event) {
+    const tab = event.target.closest('.tab');
+    if (tab) {
+      if (!confirmLeave()) return;
+      goTo(tab.dataset.view);
+      return;
+    }
+    const el = event.target.closest('[data-action]');
+    if (!el) return;
+    const action = el.dataset.action;
+
+    if (action === 'start') {
+      const task = tasks().find((t) => t.key === el.dataset.task);
+      if (task && task.ids.length) { setNotice(''); openEditor(task.ids[0], task.ids.slice()); }
+    } else if (action === 'open') {
+      setNotice('');
+      openEditor(el.dataset.id, null);
+    } else if (action === 'new') {
+      setNotice('');
+      openNew();
+    } else if (action === 'filter') {
+      state.filter = el.dataset.filter;
+      renderAll();
+    } else if (action === 'back') {
+      if (!confirmLeave()) return;
+      goTo(state.returnView);
+    } else if (action === 'undo') {
+      state.draft = copy(currentRecord());
+      setNotice('Cofnięto niezapisane zmiany.');
+      renderEditor();
+    } else if (action === 'preview') {
+      state.preview = !state.preview;
+      el.setAttribute('aria-expanded', String(state.preview));
+      el.textContent = state.preview ? 'Ukryj podgląd' : 'Pokaż, jak zobaczy to gość';
+      renderPreview();
+    } else if (action === 'export') {
+      downloadJson('fallback-questions.json', guestExport());
+    } else if (['import', 'refresh-sync', 'dedupe-preview', 'dedupe-run'].includes(action)) {
+      runTool(action);
+    } else {
+      runAction(action);
+    }
+  });
+
+  function onFieldChange(event) {
+    const field = event.target.dataset.field;
+    if (field && state.draft) {
+      if (event.target.type === 'checkbox') state.draft[field] = event.target.checked ? 'tak' : 'nie';
+      else state.draft[field] = event.target.value;
+      const box = document.getElementById('actionError');
+      if (box) box.innerHTML = '';
+      updateDirtyUi();
+      return;
+    }
+    if (event.target.id === 'search') {
+      state.search = event.target.value;
+      renderList();
+    }
   }
+  document.addEventListener('input', onFieldChange);
+  document.addEventListener('change', onFieldChange);
 
-  function showGuestExport() { el.previewArea.value = JSON.stringify(guestExport(), null, 2); }
+  window.addEventListener('beforeunload', function (event) {
+    if (state.view === 'edit' && isDirty()) { event.preventDefault(); event.returnValue = ''; }
+  });
 
-  function wireEvents() {
-    el.loadBtn.addEventListener('click', loadRecords);
-    el.saveBtn.addEventListener('click', saveAllRecords);
-    el.searchInput.addEventListener('input', renderTable);
-    el.categoryFilter.addEventListener('change', renderTable);
-    el.statusFilter.addEventListener('change', renderTable);
-    el.readyFilter.addEventListener('change', renderTable);
-    el.newBtn.addEventListener('click', createNewRecord);
-    el.bulkReadyYesBtn.addEventListener('click', function () { filteredRecords().forEach((record) => { record.gotowe_redakcyjnie = 'tak'; }); renderTable(); say('Ustawiono gotowe redakcyjnie = tak dla rekordów po filtrach.'); });
-    el.bulkReadyNoBtn.addEventListener('click', function () { filteredRecords().forEach((record) => { record.gotowe_redakcyjnie = 'nie'; record.aktywne = 'nie'; record.rdzen = 'nie'; }); renderTable(); say('Ustawiono gotowe redakcyjnie = nie dla rekordów po filtrach.'); });
-    el.showGuestExportBtn.addEventListener('click', showGuestExport);
-    el.downloadGuestExportBtn.addEventListener('click', function () { downloadJson('odkryj-womai-dane-goscia.json', guestExport()); });
-    el.recordsBody.addEventListener('click', function (event) {
-      const editId = event.target.getAttribute('data-edit');
-      const toggleReadyId = event.target.getAttribute('data-toggle-ready');
-      const toggleActiveId = event.target.getAttribute('data-toggle-active');
-      const toggleCoreId = event.target.getAttribute('data-toggle-core');
-      const recordId = editId || toggleReadyId || toggleActiveId || toggleCoreId;
-      const record = state.records.find((item) => item.id === recordId);
-      if (editId) return openEditor(editId);
-      if (!record) return;
-      if (toggleReadyId) {
-        record.gotowe_redakcyjnie = record.gotowe_redakcyjnie === 'tak' ? 'nie' : 'tak';
-        if (record.gotowe_redakcyjnie === 'nie') { record.aktywne = 'nie'; record.rdzen = 'nie'; }
-      }
-      if (toggleActiveId) {
-        record.aktywne = record.aktywne === 'tak' ? 'nie' : 'tak';
-        if (record.aktywne === 'tak') record.gotowe_redakcyjnie = 'tak';
-        if (record.aktywne === 'nie') record.rdzen = 'nie';
-      }
-      if (toggleCoreId) {
-        record.rdzen = record.rdzen === 'tak' ? 'nie' : 'tak';
-        if (record.rdzen === 'tak') { record.aktywne = 'tak'; record.gotowe_redakcyjnie = 'tak'; }
-      }
-      renderTable();
-    });
-    el.editorForm.addEventListener('submit', saveCurrentRecord);
-    el.duplicateBtn.addEventListener('click', duplicateCurrentRecord);
-    el.deleteBtn.addEventListener('click', deleteCurrentRecord);
-    el.closeEditorBtn.addEventListener('click', closeEditor);
-    el.recChoiceCount.addEventListener('change', function () {
-      el.recChoice3.disabled = el.recChoiceCount.value === '2';
-      if (el.recChoiceCount.value === '2') el.recChoice3.value = '';
-    });
-  }
-
-  updateRoleUi();
-  wireEvents();
-  renderTable();
+  render();
   signIn();
 }());

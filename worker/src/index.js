@@ -9,9 +9,14 @@ const API_PREFIX = '/odkryj-womai/admin/api/';
 const ACTIONS = {
   health: 'admin',
   records: 'admin',
+  stats: 'admin',
   upsertRecord: 'admin',
   save: 'superadmin',
-  deleteRecord: 'superadmin'
+  deleteRecord: 'superadmin',
+  syncStatus: 'superadmin',
+  syncFormResponses: 'superadmin',
+  dedupePreview: 'superadmin',
+  dedupeRecords: 'superadmin'
 };
 
 const CERTS_TTL_MS = 60 * 60 * 1000;
