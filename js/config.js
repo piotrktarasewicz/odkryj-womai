@@ -13,7 +13,9 @@ window.WOMAI_CONFIG = {
     requestTimeoutMs: 10000
   },
   admin: {
-    storageKey: 'womai_admin_v5_connection',
+    apiBaseUrl: '/odkryj-womai/admin/api/',
+    // Dawny zapis adresu i tokenu w przeglądarce, usuwany przy wejściu do panelu.
+    legacyStorageKey: 'womai_admin_v5_connection',
     requestTimeoutMs: 15000
   }
 };

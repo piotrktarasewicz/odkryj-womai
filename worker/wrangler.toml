@@ -1,0 +1,21 @@
+name = "odkryj-womai-admin-api"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = false
+
+# Worker obsługuje tylko API panelu administratora. Ta ścieżka leży pod
+# /odkryj-womai/admin/, więc chroni ją ta sama aplikacja Cloudflare Access.
+routes = [
+  { pattern = "ptprojects.app/odkryj-womai/admin/api/*", zone_name = "ptprojects.app" }
+]
+
+[vars]
+APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw4DT_QBC8em-TEXhP7BeAiiFZDrZqzSpLeOuy9HziSqlEVqwWiTbMql1qi0uSsuZ9v/exec"
+ACCESS_TEAM_DOMAIN = "womai.cloudflareaccess.com"
+ACCESS_AUD = "f87eca897045b309d2c8568be18b187f5548f99b6e4ed338b4d1758acb7983b3"
+
+# Sekrety ustawiane poza repozytorium (wrangler secret put NAZWA):
+#   ADMIN_TOKEN       token roli admin z Apps Script
+#   SUPERADMIN_TOKEN  token roli superadmin z Apps Script
+#   ADMINS            adresy e-mail adminów, rozdzielone przecinkami
+#   SUPERADMINS       adresy e-mail superadminów, rozdzielone przecinkami

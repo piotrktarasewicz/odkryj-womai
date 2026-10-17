@@ -3,12 +3,11 @@
 
   const config = window.WOMAI_CONFIG || {};
   const api = window.WOMAI_API;
-  const STORAGE_KEY = config.admin?.storageKey || 'womai_admin_v5_connection';
-  const state = { records: [], selectedId: null };
+  const LEGACY_STORAGE_KEY = config.admin?.legacyStorageKey || 'womai_admin_v5_connection';
+  const state = { records: [], selectedId: null, role: null, email: '' };
 
   const el = {
-    endpointUrl: document.getElementById('endpointUrl'), roleSelect: document.getElementById('roleSelect'), tokenInput: document.getElementById('tokenInput'),
-    saveConnectionBtn: document.getElementById('saveConnectionBtn'), clearConnectionBtn: document.getElementById('clearConnectionBtn'), healthBtn: document.getElementById('healthBtn'), loadBtn: document.getElementById('loadBtn'), saveBtn: document.getElementById('saveBtn'),
+    accountEmail: document.getElementById('accountEmail'), loadBtn: document.getElementById('loadBtn'), saveBtn: document.getElementById('saveBtn'),
     activeRole: document.getElementById('activeRole'), roleHint: document.getElementById('roleHint'), connectionLive: document.getElementById('connectionLive'), connectionError: document.getElementById('connectionError'), statsBox: document.getElementById('statsBox'),
     searchInput: document.getElementById('searchInput'), categoryFilter: document.getElementById('categoryFilter'), statusFilter: document.getElementById('statusFilter'), readyFilter: document.getElementById('readyFilter'),
     newBtn: document.getElementById('newBtn'), bulkReadyYesBtn: document.getElementById('bulkReadyYesBtn'), bulkReadyNoBtn: document.getElementById('bulkReadyNoBtn'),
@@ -23,14 +22,17 @@
   function sayError(text) { el.connectionLive.textContent = ''; el.connectionError.textContent = ''; requestAnimationFrame(() => { el.connectionError.textContent = text; }); }
   function sayEditor(text) { el.editorError.textContent = ''; el.editorLive.textContent = ''; requestAnimationFrame(() => { el.editorLive.textContent = text; }); }
   function sayEditorError(text) { el.editorLive.textContent = ''; el.editorError.textContent = ''; requestAnimationFrame(() => { el.editorError.textContent = text; }); }
-  function currentRole() { return el.roleSelect.value; }
+  function currentRole() { return state.role; }
   function isSuperadmin() { return currentRole() === 'superadmin'; }
 
   function updateRoleUi() {
-    el.activeRole.textContent = currentRole();
-    el.roleHint.textContent = isSuperadmin()
-      ? 'Superadmin może czytać, edytować wszystko, usuwać rekordy i nadpisywać bazę.'
-      : 'Admin może czytać, porządkować i publikować pytania, ale nie usuwa rekordów i nie zmienia pełnej struktury bazy.';
+    el.activeRole.textContent = currentRole() || '—';
+    el.roleHint.textContent = !currentRole() ? ''
+      : isSuperadmin()
+        ? 'Superadmin może czytać, edytować wszystko, usuwać rekordy i nadpisywać bazę.'
+        : 'Admin może czytać, porządkować i publikować pytania, ale nie usuwa rekordów i nie zmienia pełnej struktury bazy.';
+    el.loadBtn.disabled = !currentRole();
+    el.saveBtn.hidden = !isSuperadmin();
     el.deleteBtn.disabled = !isSuperadmin();
     el.recId.readOnly = !isSuperadmin();
     el.recSource.readOnly = !isSuperadmin();
@@ -38,37 +40,26 @@
     el.recVersion.readOnly = !isSuperadmin();
   }
 
-  function saveConnection() {
-    const payload = { endpointUrl: el.endpointUrl.value.trim(), role: el.roleSelect.value, token: el.tokenInput.value };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    updateRoleUi();
-    say('Zapamiętano połączenie.');
-  }
-
-  function loadConnection() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      el.endpointUrl.value = parsed.endpointUrl || config.apiUrl || '';
-      el.roleSelect.value = parsed.role || 'admin';
-      el.tokenInput.value = parsed.token || '';
-    } catch (error) {}
-    if (!el.endpointUrl.value && config.apiUrl) el.endpointUrl.value = config.apiUrl;
-    updateRoleUi();
-  }
-
-  function clearConnection() {
-    localStorage.removeItem(STORAGE_KEY);
-    el.endpointUrl.value = config.apiUrl || '';
-    el.roleSelect.value = 'admin';
-    el.tokenInput.value = '';
-    updateRoleUi();
-    say('Wyczyszczono zapisane połączenie.');
-  }
-
   async function requestJson(method, action, body) {
-    return api.requestAdminJson(el.endpointUrl.value.trim(), el.tokenInput.value, method, action, body);
+    return api.requestAdminJson(method, action, body);
+  }
+
+  // Cloudflare Access już zalogował osobę, Worker zwraca jej e-mail i rolę.
+  async function signIn() {
+    // Panel nie przechowuje już adresu endpointu ani tokenu w przeglądarce.
+    try { localStorage.removeItem(LEGACY_STORAGE_KEY); } catch (error) {}
+    try {
+      const json = await requestJson('GET', 'me');
+      state.email = json.email;
+      state.role = json.role;
+      el.accountEmail.textContent = json.email;
+      updateRoleUi();
+      await loadRecords();
+    } catch (error) {
+      el.accountEmail.textContent = 'nie rozpoznano';
+      updateRoleUi();
+      sayError(error.message);
+    }
   }
 
   function toRecordShape(raw) {
@@ -162,7 +153,7 @@
       state.records = (json.records || []).map(toRecordShape);
       renderTable();
       closeEditor();
-      say('Pobrano rekordy z endpointu.');
+      say('Pobrano rekordy.');
     } catch (error) { sayError(error.message); }
   }
 
@@ -201,13 +192,6 @@
       closeEditor();
       sayEditor('Usunięto rekord.');
     } catch (error) { sayEditorError(error.message); }
-  }
-
-  async function healthCheck() {
-    try {
-      const json = await requestJson('GET', 'health');
-      say('Endpoint działa. Rola: ' + json.role + '.');
-    } catch (error) { sayError(error.message); }
   }
 
   function createNewRecord() {
@@ -253,10 +237,6 @@
   function showGuestExport() { el.previewArea.value = JSON.stringify(guestExport(), null, 2); }
 
   function wireEvents() {
-    el.roleSelect.addEventListener('change', updateRoleUi);
-    el.saveConnectionBtn.addEventListener('click', saveConnection);
-    el.clearConnectionBtn.addEventListener('click', clearConnection);
-    el.healthBtn.addEventListener('click', healthCheck);
     el.loadBtn.addEventListener('click', loadRecords);
     el.saveBtn.addEventListener('click', saveAllRecords);
     el.searchInput.addEventListener('input', renderTable);
@@ -302,7 +282,8 @@
     });
   }
 
-  loadConnection();
+  updateRoleUi();
   wireEvents();
   renderTable();
+  signIn();
 }());

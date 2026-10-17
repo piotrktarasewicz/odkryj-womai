@@ -33,6 +33,7 @@ jobs:
           rsync -a --delete \
             --exclude='.git' \
             --exclude='.github' \
+            --exclude='worker' \
             source/ target/odkryj-womai/
 
       - name: Commit and push if changed

@@ -14,7 +14,7 @@
         <div class="brand-logo-placeholder" aria-hidden="true">W</div>
         <div>
           <h1>Odkryj Womai — panel administratora v7</h1>
-          <p>Wersja dopasowana do endpointu z rolami <strong>admin</strong> i <strong>superadmin</strong>.</p>
+          <p>Logowanie przez Cloudflare Access. Rola <strong>admin</strong> albo <strong>superadmin</strong> wynika z adresu e-mail.</p>
         </div>
       </div>
       <div id="statsBox"></div>
@@ -23,34 +23,16 @@
 
   <main>
     <section>
-      <h2>Połączenie i uprawnienia</h2>
-      <div class="grid3">
-        <div class="field">
-          <label for="endpointUrl">Adres endpointu</label>
-          <input id="endpointUrl" type="url" placeholder="Wklej adres web app z Apps Script" />
-        </div>
-        <div class="field">
-          <label for="roleSelect">Rola</label>
-          <select id="roleSelect">
-            <option value="admin">admin</option>
-            <option value="superadmin">superadmin</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="tokenInput">Token</label>
-          <input id="tokenInput" type="password" placeholder="Wklej token dla wybranej roli" />
-        </div>
+      <h2>Konto</h2>
+      <div class="summary">
+        <p><strong>Zalogowano jako:</strong> <span id="accountEmail">sprawdzanie…</span></p>
+        <p><strong>Rola:</strong> <span id="activeRole">—</span></p>
+        <p id="roleHint" class="muted"></p>
       </div>
       <div class="button-row">
-        <button id="saveConnectionBtn" type="button">Zapamiętaj połączenie</button>
-        <button id="clearConnectionBtn" type="button">Wyczyść połączenie</button>
-        <button id="healthBtn" type="button">Sprawdź endpoint</button>
-        <button id="loadBtn" class="primary" type="button">Pobierz rekordy</button>
-        <button id="saveBtn" type="button">Zapisz wszystkie rekordy</button>
-      </div>
-      <div class="summary">
-        <p><strong>Rola aktywna:</strong> <span id="activeRole">admin</span></p>
-        <p id="roleHint" class="muted">Admin może czytać, porządkować i publikować pytania. Superadmin może dodatkowo usuwać rekordy i nadpisywać całą bazę.</p>
+        <button id="loadBtn" class="primary" type="button" disabled>Odśwież rekordy</button>
+        <button id="saveBtn" type="button" hidden>Zapisz wszystkie rekordy</button>
+        <a class="logout-link" href="/cdn-cgi/access/logout">Wyloguj</a>
       </div>
       <div id="connectionLive" class="live" aria-live="polite"></div>
       <div id="connectionError" class="error" aria-live="assertive"></div>

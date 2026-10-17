@@ -114,25 +114,48 @@
     return json;
   }
 
-  async function requestAdminJson(endpoint, token, method, action, body) {
-    if (!endpoint) throw new Error('Brak adresu endpointu.');
-    if (!token) throw new Error('Brak tokenu.');
+  // Zapytania idą do Workera pod adresem panelu. Worker rozpoznaje osobę
+  // po logowaniu Cloudflare Access i sam dokłada token do Apps Script.
+  async function requestAdminJson(method, action, body) {
+    const base = config.admin?.apiBaseUrl || '/odkryj-womai/admin/api/';
+    const url = new URL(action, new URL(base, window.location.href));
 
-    const url = new URL(endpoint);
-    url.searchParams.set('action', action);
-    url.searchParams.set('token', token);
-
-    const options = { method, headers: { 'Accept': 'application/json' } };
+    const options = {
+      method,
+      credentials: 'same-origin',
+      redirect: 'manual',
+      headers: { 'Accept': 'application/json' }
+    };
     if (method !== 'GET') {
       options.headers['Content-Type'] = 'text/plain;charset=utf-8';
       options.body = JSON.stringify(body || {});
     }
 
-    const { response, json } = await fetchJsonWithTimeout(
-      url.toString(),
-      options,
-      timeoutMs(config.admin)
-    );
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs(config.admin));
+    let response;
+    try {
+      response = await fetch(url.toString(), { ...options, signal: controller.signal });
+    } catch (error) {
+      if (error && error.name === 'AbortError') {
+        throw new Error('Przekroczono czas oczekiwania na odpowiedź.');
+      }
+      throw new Error('Brak połączenia z serwerem panelu.');
+    } finally {
+      window.clearTimeout(timer);
+    }
+
+    // Cloudflare Access przekierowuje na stronę logowania, gdy sesja wygaśnie.
+    if (response.type === 'opaqueredirect' || response.status === 401) {
+      throw new Error('Sesja logowania wygasła. Odśwież stronę, aby zalogować się ponownie.');
+    }
+
+    let json;
+    try {
+      json = await response.json();
+    } catch (error) {
+      throw new Error('Odpowiedź serwera nie jest poprawnym JSON-em.');
+    }
 
     if (!response.ok || !json.ok) {
       throw new Error(json && json.error ? json.error : ('Błąd HTTP ' + response.status));
