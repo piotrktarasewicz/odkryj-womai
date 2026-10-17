@@ -87,21 +87,22 @@ Panel nie ma własnego formularza logowania. Osoba loguje się przez Cloudflare 
 
 1. Cloudflare Access wpuszcza na `/odkryj-womai/admin/` osoby z listy w swojej polityce.
 2. Panel wysyła zapytania do `/odkryj-womai/admin/api/…`. Tę ścieżkę obsługuje Worker `odkryj-womai-admin-api`.
-3. Worker sprawdza podpisany token logowania Access (`Cf-Access-Jwt-Assertion`), odczytuje z niego e-mail i ustala rolę z sekretów `SUPERADMINS` i `ADMINS`.
+3. Worker sprawdza podpisany token logowania Access (`Cf-Access-Jwt-Assertion`), odczytuje z niego e-mail i ustala rolę ze zmiennych `SUPERADMINS` i `ADMINS`.
 4. Worker dokłada token właściwej roli (`ADMIN_TOKEN` albo `SUPERADMIN_TOKEN`) i przekazuje zapytanie do Apps Script. Tokeny nie trafiają do przeglądarki.
 
-Adresów e-mail i tokenów nie zapisuje się w repozytorium, bo jest publiczne. Ustawia się je jako sekrety Workera:
+Adresów e-mail i tokenów nie zapisuje się w repozytorium, bo jest publiczne.
+
+Tokeny są ukrytymi sekretami Workera:
 
 ```text
 cd worker
 npx wrangler secret put ADMIN_TOKEN
 npx wrangler secret put SUPERADMIN_TOKEN
-npx wrangler secret put SUPERADMINS
-npx wrangler secret put ADMINS
-npx wrangler deploy
 ```
 
-Listy adresów rozdziela się przecinkami. Dodanie lub usunięcie osoby wymaga zmiany sekretu Workera i polityki w Cloudflare Access (Zero Trust → Access → Applications).
+Listy adresów są widocznymi zmiennymi w panelu Cloudflare: Workers & Pages → `odkryj-womai-admin-api` → Settings → Variables and Secrets, typ **Text**, nazwy `SUPERADMINS` i `ADMINS`. Adresy rozdziela się przecinkami. `keep_vars = true` w `wrangler.toml` sprawia, że `npx wrangler deploy` ich nie kasuje.
+
+Dodanie lub usunięcie osoby wymaga zmiany listy w Workerze i polityki w Cloudflare Access (Zero Trust → Access → Applications).
 
 Katalog `worker/` nie jest publikowany do `ptprojects`.
 
