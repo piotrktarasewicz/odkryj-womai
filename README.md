@@ -90,6 +90,8 @@ Panel zaczyna się od zadań („Do zrobienia”), a nie od tabeli. Każde pytan
 - **Odrzucone**: `status = odrzucone`, oba pola `nie`,
 - **Nieopublikowane**: pozostałe (np. `status = nowe` z formularza).
 
+Po zmianie plików CSS lub JS panelu podnieś numer `?v=` w `admin/index.html`. Cloudflare i przeglądarki trzymają te pliki do 4 godzin, więc bez nowego numeru nowa strona uruchomi stary kod.
+
 Zmiany treści zapisuje przycisk „Zapisz”, a przyciski stanu („Opublikuj w quizie”, „Odrzuć” itd.) zapisują od razu, razem z niezapisaną treścią. Panel zapisuje zawsze jeden rekord (`upsertRecord`); pełnego nadpisania bazy (`save`) nie używa.
 
 ## Logowanie do panelu administratora
