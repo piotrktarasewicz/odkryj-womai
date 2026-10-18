@@ -89,9 +89,9 @@ p { margin: 0 0 12px; }
 .tile { border: 2px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin: 0 0 12px; }
 .tile p { margin: 0; color: var(--text-soft); white-space: pre-line; }
 .tile-y { border-color: var(--yellow); }
-.tile-y h3 { color: var(--yellow); }
+.tile-y h2, .tile-y h3 { color: var(--yellow); }
 .tile-v { border-color: var(--violet-line); }
-.tile-v h3 { color: var(--violet-text); }
+.tile-v h2, .tile-v h3 { color: var(--violet-text); }
 .tile h3 { font-size: 1.05rem; margin: 0 0 4px; }
 .visit dl { margin: 0; display: grid; gap: 10px; }
 .visit dt { font-weight: 700; }

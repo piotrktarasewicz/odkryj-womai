@@ -356,11 +356,69 @@
         cField(kind + '.' + i + '.text', 'Treść', item.text, { long: true }) +
         '<div class="field"><div class="check"><input type="checkbox" id="c-' + kind + '-' + i + '-active" data-cfield="' + kind + '.' + i + '.active"' + (item.active ? ' checked' : '') + ' /><label for="c-' + kind + '-' + i + '-active">Widoczna dla gości</label></div></div>' +
         '<div class="toolbar">' +
-        (i > 0 ? '<button type="button" class="btn" data-action="c-move" data-kind="' + kind + '" data-index="' + i + '" data-dir="-1">Przesuń wyżej' + name + '</button>' : '') +
-        (i < items.length - 1 ? '<button type="button" class="btn" data-action="c-move" data-kind="' + kind + '" data-index="' + i + '" data-dir="1">Przesuń niżej' + name + '</button>' : '') +
+        (kind === 'facts' && i > 0 ? '<button type="button" class="btn" data-action="c-move" data-kind="' + kind + '" data-index="' + i + '" data-dir="-1">Przesuń wyżej' + name + '</button>' : '') +
+        (kind === 'facts' && i < items.length - 1 ? '<button type="button" class="btn" data-action="c-move" data-kind="' + kind + '" data-index="' + i + '" data-dir="1">Przesuń niżej' + name + '</button>' : '') +
         '<button type="button" class="btn btn-danger" data-action="c-remove" data-kind="' + kind + '" data-index="' + i + '">Usuń' + name + '</button></div></fieldset>';
     });
     return html + '<button type="button" class="btn btn-primary" data-action="c-add" data-kind="' + kind + '" id="c-add-' + kind + '">' + meta.add + '</button>';
+  }
+
+  const BASE_BLOCKS = ['intro', 'path:ciemnosc', 'path:swiatlo', 'facts', 'visit'];
+
+  function draftOrder() {
+    const d = state.cDraft;
+    const allowed = BASE_BLOCKS.concat(d.sections.map((s) => 'section:' + s.id));
+    const order = (Array.isArray(d.order) ? d.order : []).filter((k, i, all) => allowed.includes(k) && all.indexOf(k) === i);
+    allowed.forEach((k) => { if (!order.includes(k)) order.push(k); });
+    d.order = order;
+    return order;
+  }
+
+  // Nazwa bloku na liście kolejności i informacja, czy gość go zobaczy.
+  function blockInfo(key) {
+    const d = state.cDraft;
+    if (key === 'intro') return { label: 'Wstęp „O WOMAI”', empty: !String(d.about.intro || '').trim() };
+    if (key === 'facts') return { label: 'Ciekawostki', empty: !d.facts.some((f) => f.active) };
+    if (key === 'visit') {
+      const v = d.visit;
+      return { label: 'Odwiedź nas (adres, godziny, bilety, strona)', empty: ![v.address, v.hours, v.tickets, v.website].some((x) => String(x || '').trim()) };
+    }
+    if (key.startsWith('path:')) {
+      const p = d.paths.find((x) => 'path:' + x.id === key) || {};
+      return { label: 'Ścieżka: ' + (p.title || ''), empty: !String(p.text || '').trim() };
+    }
+    const i = d.sections.findIndex((x) => 'section:' + x.id === key);
+    const sec = d.sections[i] || {};
+    return { label: 'Sekcja ' + (i + 1) + ': ' + (sec.title || 'bez tytułu'), empty: !sec.active || !sec.title || !sec.text };
+  }
+
+  function orderLabelHtml(info) {
+    return esc(info.label) + (info.empty ? ' <span class="muted small">(pusty, gość go nie zobaczy)</span>' : '');
+  }
+
+  // Odświeża nazwy na liście kolejności w trakcie pisania, bez przebudowy
+  // ekranu, żeby nie zgubić miejsca, w którym jest kursor.
+  function refreshOrderLabels() {
+    document.querySelectorAll('.order-list li[data-key]').forEach((li) => {
+      const info = blockInfo(li.dataset.key);
+      li.querySelector('.order-label').innerHTML = orderLabelHtml(info);
+      li.querySelectorAll('[data-action="c-order"] .visually-hidden').forEach((sr) => { sr.textContent = ': ' + info.label; });
+    });
+  }
+
+  function orderHtml() {
+    const order = draftOrder();
+    return '<section class="card" aria-labelledby="c-order-h"><h3 id="c-order-h">Kolejność na stronie gościa</h3>' +
+      '<p class="muted small">W tej kolejności gość zobaczy bloki w „O WOMAI”. Puste bloki się nie pokażą.</p>' +
+      '<ol class="order-list">' + order.map((key, i) => {
+        const info = blockInfo(key);
+        const name = '<span class="visually-hidden">: ' + esc(info.label) + '</span>';
+        return '<li id="c-order-' + i + '" data-key="' + esc(key) + '"><span class="order-label">' + orderLabelHtml(info) + '</span>' +
+          '<span class="order-buttons">' +
+          (i > 0 ? '<button type="button" class="btn" data-action="c-order" data-index="' + i + '" data-dir="-1">Przesuń wyżej' + name + '</button>' : '') +
+          (i < order.length - 1 ? '<button type="button" class="btn" data-action="c-order" data-index="' + i + '" data-dir="1">Przesuń niżej' + name + '</button>' : '') +
+          '</span></li>';
+      }).join('') + '</ol></section>';
   }
 
   function contentStatus() {
@@ -382,8 +440,7 @@
     let html = '<h2>Treści dla gości</h2>' +
       '<p>Tu wpisujesz teksty do sekcji „O WOMAI” w panelu gościa. Puste pola nie pojawią się u gości. Zmiany zapisuje przycisk „Zapisz”, a goście zobaczą je w ciągu minuty.</p>' +
       '<p class="muted small">' + esc(contentStatus()) + '</p>' +
-      '<div class="box-warn">Ciekawostki goście widzą już teraz. Wstęp, ścieżki, odwiedziny i dodatkowe sekcje pokaże nowy panel gościa, który jest w przygotowaniu.</div>' +
-      '<div id="cDirtyTop"></div>';
+      '<div id="cDirtyTop"></div>' + orderHtml();
 
     html += '<section class="card" aria-labelledby="c-about-h"><h3 id="c-about-h">O WOMAI</h3>' +
       cField('about.intro', 'Wstęp', d.about.intro, { long: true, help: '2–3 zdania o tym, czym jest WOMAI.' }) + '</section>';
@@ -472,6 +529,7 @@
       const item = { id: CONTENT_LISTS[kind].prefix + '-' + Date.now().toString(36), title: '', text: '', active: true };
       if (kind === 'facts') item.category = '';
       list.push(item);
+      if (kind === 'sections') draftOrder();
       renderContent();
       focusIn('#c-' + kind + '-' + (list.length - 1) + ' input[type="text"]');
       setNotice('Dodano: ' + CONTENT_LISTS[kind].one + ' ' + list.length + '. Uzupełnij ją i zapisz.');
@@ -480,10 +538,22 @@
     if (action === 'c-remove') {
       const kind = el.dataset.kind, i = Number(el.dataset.index);
       state.cDraft[kind].splice(i, 1);
+      if (kind === 'sections') draftOrder();
       renderContent();
       const left = state.cDraft[kind].length;
       if (!left || !focusIn('#c-' + kind + '-' + Math.min(i, left - 1) + ' legend + .field input, #c-' + kind + '-' + Math.min(i, left - 1) + ' input[type="text"]')) focusIn('#c-add-' + kind);
       setNotice('Usunięto: ' + CONTENT_LISTS[kind].one + ' ' + (i + 1) + '. Zmiana nie jest jeszcze zapisana.');
+      return;
+    }
+    if (action === 'c-order') {
+      const i = Number(el.dataset.index), dir = Number(el.dataset.dir);
+      const order = draftOrder();
+      const [key] = order.splice(i, 1);
+      order.splice(i + dir, 0, key);
+      renderContent();
+      const box = '#c-order-' + (i + dir);
+      if (!focusIn(box + ' [data-action="c-order"][data-dir="' + dir + '"]')) focusIn(box + ' [data-action="c-order"]');
+      setNotice('Przesunięto „' + blockInfo(key).label + '” na pozycję ' + (i + dir + 1) + '. Zmiana nie jest jeszcze zapisana.');
       return;
     }
     if (action === 'c-move') {
@@ -864,6 +934,7 @@
     if (cfield && state.cDraft) {
       setPath(state.cDraft, cfield, event.target.type === 'checkbox' ? event.target.checked : event.target.value);
       updateContentDirtyUi();
+      refreshOrderLabels();
       return;
     }
     const field = event.target.dataset.field;

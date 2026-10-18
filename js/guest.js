@@ -484,36 +484,51 @@
     currentFactIndex = Math.min(currentFactIndex, Math.max(WOMAI_FACTS.length - 1, 0));
   }
 
-  function renderAbout() {
-    const c = CONTENT || {};
-    let html = '';
-    const intro = c.about && String(c.about.intro || '').trim();
-    if (intro) html += `<div class="about-block"><p>${esc(intro)}</p></div>`;
+  const DEFAULT_ORDER = ['intro', 'path:ciemnosc', 'path:swiatlo', 'facts', 'visit'];
 
-    const paths = (Array.isArray(c.paths) ? c.paths : []).filter((p) => p && String(p.text || '').trim());
-    if (paths.length) {
-      html += '<section class="about-block" aria-labelledby="aboutPathsH"><h2 id="aboutPathsH">Ścieżki</h2>' +
-        paths.map((p) => `<div class="tile tile-${PATH_ACCENT[p.id] || 'n'}"><h3>${esc(p.title)}</h3><p>${esc(p.text)}</p></div>`).join('') + '</section>';
+  // Bloki strony „O WOMAI” w kolejności ustawionej w panelu admina.
+  // Puste bloki są pomijane.
+  function aboutBlock(key, c) {
+    if (key === 'intro') {
+      const intro = c.about && String(c.about.intro || '').trim();
+      return intro ? `<div class="about-block"><p>${esc(intro)}</p></div>` : '';
     }
-
-    html += `<section class="about-block" aria-labelledby="aboutFactsH"><h2 id="aboutFactsH">Ciekawostki</h2><p>${factsCount(WOMAI_FACTS.length)} o zmysłach, dostępności i doświadczeniach WOMAI.</p>` +
-      '<button type="button" class="btn" id="openFactsBtn">Przeglądaj ciekawostki</button></section>';
-
-    const v = c.visit || {};
-    const visitItems = [['Adres', v.address], ['Godziny otwarcia', v.hours], ['Bilety', v.tickets]].filter(([, val]) => String(val || '').trim());
-    const website = String(v.website || '').trim();
-    if (visitItems.length || /^https:\/\//i.test(website)) {
-      html += '<section class="about-block tile visit" aria-labelledby="aboutVisitH"><h2 id="aboutVisitH">Odwiedź nas</h2><dl>' +
-        visitItems.map(([label, val]) => `<dt>${label}</dt><dd>${esc(val)}</dd>`).join('') +
-        (/^https:\/\//i.test(website) ? `<dt>Strona internetowa</dt><dd><a href="${esc(website)}" target="_blank" rel="noopener">Strona WOMAI (otwiera się w nowej karcie)</a></dd>` : '') +
+    if (key === 'facts') {
+      return `<section class="about-block" aria-labelledby="aboutFactsH"><h2 id="aboutFactsH">Ciekawostki</h2><p>${factsCount(WOMAI_FACTS.length)} o zmysłach, dostępności i doświadczeniach WOMAI.</p>` +
+        '<button type="button" class="btn" id="openFactsBtn">Przeglądaj ciekawostki</button></section>';
+    }
+    if (key === 'visit') {
+      const v = c.visit || {};
+      const items = [['Adres', v.address], ['Godziny otwarcia', v.hours], ['Bilety', v.tickets]].filter(([, val]) => String(val || '').trim());
+      const website = String(v.website || '').trim();
+      const hasSite = /^https:\/\//i.test(website);
+      if (!items.length && !hasSite) return '';
+      return '<section class="about-block tile visit" aria-labelledby="aboutVisitH"><h2 id="aboutVisitH">Odwiedź nas</h2><dl>' +
+        items.map(([label, val]) => `<dt>${label}</dt><dd>${esc(val)}</dd>`).join('') +
+        (hasSite ? `<dt>Strona internetowa</dt><dd><a href="${esc(website)}" target="_blank" rel="noopener">Strona WOMAI (otwiera się w nowej karcie)</a></dd>` : '') +
         '</dl></section>';
     }
+    if (key.startsWith('path:')) {
+      const id = key.slice(5);
+      const p = (Array.isArray(c.paths) ? c.paths : []).find((x) => x && x.id === id);
+      if (!p || !String(p.text || '').trim()) return '';
+      return `<section class="about-block tile tile-${PATH_ACCENT[p.id] || 'n'}" aria-labelledby="aboutPath-${esc(p.id)}"><h2 id="aboutPath-${esc(p.id)}">${esc(p.title)}</h2><p>${esc(p.text)}</p></section>`;
+    }
+    if (key.startsWith('section:')) {
+      const id = key.slice(8);
+      const sec = (Array.isArray(c.sections) ? c.sections : []).find((x) => x && x.id === id);
+      if (!sec || sec.active === false || !sec.title || !sec.text) return '';
+      return `<section class="about-block" aria-labelledby="aboutSec-${esc(sec.id)}"><h2 id="aboutSec-${esc(sec.id)}">${esc(sec.title)}</h2><p>${esc(sec.text)}</p></section>`;
+    }
+    return '';
+  }
 
-    (Array.isArray(c.sections) ? c.sections : []).filter((s) => s && s.active !== false && s.title && s.text).forEach((s, i) => {
-      html += `<section class="about-block" aria-labelledby="aboutSec${i}"><h2 id="aboutSec${i}">${esc(s.title)}</h2><p>${esc(s.text)}</p></section>`;
-    });
-
-    aboutBody.innerHTML = html;
+  function renderAbout() {
+    const c = CONTENT || {};
+    const sectionKeys = (Array.isArray(c.sections) ? c.sections : []).map((x) => 'section:' + x.id);
+    const order = Array.isArray(c.order) && c.order.length ? c.order.slice() : DEFAULT_ORDER.concat(sectionKeys);
+    if (!order.includes('facts')) order.push('facts');
+    aboutBody.innerHTML = order.map((key) => aboutBlock(key, c)).join('');
   }
 
   function openAbout(focusFactsButton) {

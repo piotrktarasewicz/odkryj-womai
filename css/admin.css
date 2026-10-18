@@ -147,3 +147,8 @@ details.tech dd { margin: 0; overflow-wrap: anywhere; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 .toast:empty { padding: 0; border: 0; }
 @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+
+/* Kolejność bloków na stronie gościa */
+.order-list { margin: 10px 0 0; padding-left: 24px; display: grid; gap: 8px; }
+.order-list li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--a-border); }
+.order-buttons { display: flex; gap: 8px; flex-wrap: wrap; }

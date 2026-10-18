@@ -13,6 +13,26 @@ const PUBLIC_CACHE_SECONDS = 60;
 
 const LIMITS = { short: 120, url: 300, medium: 1000, long: 4000, facts: 100, sections: 30 };
 
+// Bloki strony „O WOMAI” w kolejności domyślnej. Dodatkowe sekcje mają
+// klucze section:<id> i domyślnie trafiają na koniec.
+const BASE_BLOCKS = ['intro', 'path:ciemnosc', 'path:swiatlo', 'facts', 'visit'];
+
+function allBlocks(sections) {
+  return BASE_BLOCKS.concat(sections.map((s) => 'section:' + s.id));
+}
+
+// Zostawia tylko istniejące bloki, bez powtórzeń, a brakujące dopisuje na końcu.
+export function normalizeOrder(input, sections) {
+  const allowed = allBlocks(sections);
+  const out = [];
+  (Array.isArray(input) ? input : []).forEach((key) => {
+    const k = String(key);
+    if (allowed.includes(k) && !out.includes(k)) out.push(k);
+  });
+  allowed.forEach((k) => { if (!out.includes(k)) out.push(k); });
+  return out;
+}
+
 export function emptyContent() {
   return {
     about: { intro: '' },
@@ -22,13 +42,22 @@ export function emptyContent() {
     ],
     visit: { address: '', hours: '', tickets: '', website: '' },
     facts: [],
-    sections: []
+    sections: [],
+    order: BASE_BLOCKS.slice()
   };
 }
 
 function text(value, max, label) {
   const result = String(value ?? '').replace(/\r\n/g, '\n').trim();
   if (result.length > max) throw new Error('Pole „' + label + '” jest za długie (najwyżej ' + max + ' znaków).');
+  return result;
+}
+
+function unique(value, used) {
+  let result = value;
+  let n = 2;
+  while (used.has(result)) { result = value + '-' + n; n += 1; }
+  used.add(result);
   return result;
 }
 
@@ -80,8 +109,9 @@ export function normalizeContent(input) {
 
   const sectionsIn = Array.isArray(src.sections) ? src.sections : [];
   if (sectionsIn.length > LIMITS.sections) throw new Error('Za dużo dodatkowych sekcji (najwyżej ' + LIMITS.sections + ').');
+  const usedIds = new Set();
   const sections = sectionsIn.map((s, i) => ({
-    id: id(s && s.id, 'sekcja', i),
+    id: unique(id(s && s.id, 'sekcja', i), usedIds),
     title: text(s && s.title, LIMITS.short, 'Tytuł sekcji ' + (i + 1)),
     text: text(s && s.text, LIMITS.long, 'Treść sekcji ' + (i + 1)),
     active: !(s && s.active === false)
@@ -90,7 +120,8 @@ export function normalizeContent(input) {
     if (s.active && (!s.title || !s.text)) throw new Error('Sekcja ' + (i + 1) + ' jest widoczna dla gości, ale nie ma tytułu albo treści.');
   });
 
-  const content = { about, paths, visit, facts, sections };
+  const order = normalizeOrder(src.order, sections);
+  const content = { about, paths, visit, facts, sections, order };
   if (JSON.stringify(content).length > MAX_BYTES) throw new Error('Treści są za długie, skróć je.');
   return content;
 }
@@ -104,14 +135,19 @@ export function publicView(content) {
     paths: content.paths,
     visit: content.visit,
     facts: content.facts.filter((f) => f.active),
-    sections: content.sections.filter((s) => s.active)
+    sections: content.sections.filter((s) => s.active),
+    order: content.order
   };
 }
 
 async function readDoc(env, cacheTtl) {
   const options = cacheTtl ? { type: 'json', cacheTtl } : { type: 'json' };
   const doc = await env.CONTENT.get(KEY, options);
-  if (doc && doc.content) return doc;
+  if (doc && doc.content) {
+    // Starsze zapisy nie miały kolejności bloków: uzupełniamy ją przy odczycie.
+    try { doc.content = normalizeContent(doc.content); } catch (error) { /* zostawiamy jak jest */ }
+    return doc;
+  }
   return { content: emptyContent(), version: 0, updatedAt: '', updatedBy: '' };
 }
 
