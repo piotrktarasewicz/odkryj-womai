@@ -64,7 +64,41 @@
 
   // Treść wstawiana z opóźnieniem, żeby czytnik ekranu ogłosił ją ponownie.
   let noticeTimer = 0;
+  // Potwierdzenia (zapis, publikacja itp.) pokazują się na 5 sekund jako
+  // komunikat, który czytnik ekranu odczytuje od razu. Błędy zostają na
+  // stałe nad treścią, aż zniknie ich przyczyna.
+  const toast = document.getElementById('toast');
+  let toastShowTimer = 0;
+  let toastHideTimer = 0;
+  function showToast(text) {
+    window.clearTimeout(toastShowTimer);
+    window.clearTimeout(toastHideTimer);
+    toast.textContent = '';
+    toast.classList.remove('show');
+    toastShowTimer = window.setTimeout(() => {
+      toast.textContent = text;
+      toast.classList.add('show');
+      toastHideTimer = window.setTimeout(() => {
+        toast.classList.remove('show');
+        toast.textContent = '';
+      }, 5000);
+    }, 150);
+  }
+
+  function hideToast() {
+    window.clearTimeout(toastShowTimer);
+    window.clearTimeout(toastHideTimer);
+    toast.classList.remove('show');
+    toast.textContent = '';
+  }
+
   function setNotice(text, kind) {
+    if (text && kind !== 'bad') {
+      setNotice('');
+      showToast(text);
+      return;
+    }
+    if (text) hideToast();
     window.clearTimeout(noticeTimer);
     notice.className = 'notice' + (text ? ' ' + (kind || 'ok') : '');
     // Błędy czytnik ekranu ogłasza od razu, zwykłe komunikaty w swojej kolejce.
@@ -428,7 +462,7 @@
     if (!state.cDraft) return;
     if (action === 'c-undo') {
       state.cDraft = copy(state.content.content);
-      renderContent();
+      render(true);
       setNotice('Cofnięto niezapisane zmiany w treściach.');
       return;
     }
@@ -471,7 +505,7 @@
         const json = await requestJson('POST', 'content', { content: state.cDraft, baseVersion: state.content.version });
         state.content = { content: json.content, version: json.version, updatedAt: json.updatedAt, updatedBy: json.updatedBy };
         state.cDraft = copy(json.content);
-        renderContent();
+        render(true);
         setNotice('Zapisano treści. Goście zobaczą zmiany w ciągu minuty.');
       } else if (action === 'c-restore') {
         const version = Number(el.dataset.version);
@@ -480,7 +514,7 @@
         const json = await requestJson('POST', 'contentRestore', { version });
         state.content = { content: json.content, version: json.version, updatedAt: json.updatedAt, updatedBy: json.updatedBy };
         state.cDraft = copy(json.content);
-        renderContent();
+        render(true);
         setNotice('Przywrócono wersję ' + version + '. Zapisano ją jako wersję ' + json.version + '.');
       }
     } catch (error) {
@@ -681,7 +715,7 @@
         if (!String(state.draft.tresc_pytania || '').trim()) return showActionError('Wpisz treść pytania, zanim zapiszesz.');
         await saveRecord();
         setNotice(wasNew ? 'Zapisano nowe pytanie. Goście go jeszcze nie widzą.' : 'Zapisano zmiany. Stan pytania się nie zmienił.');
-        render();
+        render(true);
       } else if (action === 'publish') {
         const check = problems({ ...compactAnswers(state.draft), ...FLAGS.publish });
         if (!String(state.draft.kategoria || '').trim()) check.unshift('nie wybrano kategorii');
@@ -691,7 +725,7 @@
       } else if (action === 'unpublish') {
         await saveRecord(FLAGS.hold);
         setNotice(done('wycofano z quizu. Pytanie czeka na sprawdzenie.'));
-        render();
+        render(true);
       } else if (action === 'hold') {
         await saveRecord(FLAGS.hold);
         nextInQueue(done('odłożono do sprawdzenia.'));
@@ -701,7 +735,7 @@
       } else if (action === 'restore') {
         await saveRecord(FLAGS.restore);
         setNotice(done('przywrócono. Pytanie jest teraz nieopublikowane.'));
-        render();
+        render(true);
       } else if (action === 'delete') {
         if (!window.confirm('Usunąć to pytanie na zawsze? Tego nie da się cofnąć.')) return;
         await requestJson('POST', 'deleteRecord', { id: state.current });
@@ -808,7 +842,7 @@
     } else if (action === 'undo') {
       state.draft = copy(currentRecord());
       setNotice('Cofnięto niezapisane zmiany.');
-      renderEditor();
+      render(true);
     } else if (action === 'preview') {
       state.preview = !state.preview;
       el.setAttribute('aria-expanded', String(state.preview));
