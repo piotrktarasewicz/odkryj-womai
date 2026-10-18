@@ -135,3 +135,9 @@ details.tech dd { margin: 0; overflow-wrap: anywhere; }
   .task { grid-template-columns: 1fr; }
   .card { padding: 14px; }
 }
+
+/* Treści dla gości */
+.c-gap { margin-top: 20px; }
+.item { margin-top: 12px; }
+.history { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 8px; }
+.history li { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }

@@ -109,13 +109,8 @@
     }
   }
 
-  async function getFactsData() {
-    const factsDataUrl = config.guest?.factsDataUrl;
-    if (!factsDataUrl) {
-      return { facts: [] };
-    }
-
-    const factsUrl = new URL(factsDataUrl, window.location.href).toString();
+  async function fetchFacts(path) {
+    const factsUrl = new URL(path, window.location.href).toString();
     const { response, json } = await fetchJsonWithTimeout(factsUrl, {
       method: 'GET',
       headers: { 'Accept': 'application/json' }
@@ -124,8 +119,25 @@
     if (!response.ok || !json || !Array.isArray(json.facts)) {
       throw new Error('Nie udało się pobrać ciekawostek.');
     }
-
     return json;
+  }
+
+  // Ciekawostki edytowane w panelu admina; gdy brak odpowiedzi albo lista
+  // jest pusta, zapasowo plik data/facts.json.
+  async function getFactsData() {
+    const factsDataUrl = config.guest?.factsDataUrl;
+    const fallbackUrl = config.guest?.factsFallbackUrl;
+    if (!factsDataUrl) {
+      return { facts: [] };
+    }
+
+    try {
+      const json = await fetchFacts(factsDataUrl);
+      if (json.facts.length || !fallbackUrl) return json;
+    } catch (error) {
+      if (!fallbackUrl) throw error;
+    }
+    return fetchFacts(fallbackUrl);
   }
 
   // Zapytania idą do Workera pod adresem panelu. Worker rozpoznaje osobę

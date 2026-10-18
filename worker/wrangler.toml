@@ -12,9 +12,11 @@ keep_vars = true
 # więc chroni ją ta sama aplikacja Cloudflare Access.
 # Druga trasa to publiczna kopia pytań dla gości. Celowo leży POZA
 # /odkryj-womai/admin/, bo goście nie logują się.
+# Trzecia trasa to publiczne treści dla gości (O WOMAI, ciekawostki), też bez logowania.
 routes = [
   { pattern = "ptprojects.app/odkryj-womai/admin/api/*", zone_name = "ptprojects.app" },
-  { pattern = "ptprojects.app/odkryj-womai/api/guest*", zone_name = "ptprojects.app" }
+  { pattern = "ptprojects.app/odkryj-womai/api/guest*", zone_name = "ptprojects.app" },
+  { pattern = "ptprojects.app/odkryj-womai/api/content*", zone_name = "ptprojects.app" }
 ]
 
 [vars]
@@ -30,3 +32,8 @@ ACCESS_AUD = "f87eca897045b309d2c8568be18b187f5548f99b6e4ed338b4d1758acb7983b3"
 # jest publiczne):
 #   SUPERADMINS       adresy e-mail superadminów, rozdzielone przecinkami
 #   ADMINS            adresy e-mail adminów, rozdzielone przecinkami
+
+# Baza treści dla gości (O WOMAI, ciekawostki), edytowana w panelu admina.
+[[kv_namespaces]]
+binding = "CONTENT"
+id = "c5fef7d246f94ee7b939912cef01f0c6"

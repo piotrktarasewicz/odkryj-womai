@@ -6,6 +6,10 @@
 // 2. Pytania dla gości (/odkryj-womai/api/guest): publiczna kopia akcji guest,
 //    trzymana kilka minut w pamięci Cloudflare, żeby duża grupa gości naraz
 //    nie przekroczyła limitu jednoczesnych wywołań Apps Script.
+// 3. Treści dla gości (/odkryj-womai/api/content i akcje content* w panelu):
+//    przechowywane w bazie KV, opis w content.js.
+
+import { CONTENT_PUBLIC_PATH, handleContentAction, handlePublicContent } from './content.js';
 
 const API_PREFIX = '/odkryj-womai/admin/api/';
 const GUEST_PATH = '/odkryj-womai/api/guest';
@@ -281,6 +285,9 @@ export default {
     if (url.pathname.replace(/\/+$/, '') === GUEST_PATH) {
       return handleGuest(request, env, ctx, cache);
     }
+    if (url.pathname.replace(/\/+$/, '') === CONTENT_PUBLIC_PATH) {
+      return handlePublicContent(request, env);
+    }
 
     if (!url.pathname.startsWith(API_PREFIX)) return json(404, { ok: false, error: 'Nie znaleziono.' });
     const action = url.pathname.slice(API_PREFIX.length).replace(/\/+$/, '');
@@ -303,6 +310,9 @@ export default {
     }
 
     if (action === 'me') return json(200, { ok: true, email, role });
+
+    const contentResponse = await handleContentAction(action, request, env, email, role);
+    if (contentResponse) return contentResponse;
 
     const required = ACTIONS[action];
     if (!required) return json(404, { ok: false, error: 'Nieznana akcja.' });

@@ -35,7 +35,8 @@
     role: null, email: '', records: [], loaded: false,
     view: 'home', returnView: 'home', filter: 'all', search: '',
     current: null, draft: null, isNew: false, queue: null, queueIndex: 0,
-    busy: false, sync: null, dedupe: null, preview: false
+    busy: false, sync: null, dedupe: null, preview: false,
+    content: null, cDraft: null
   };
 
   const view = document.getElementById('view');
@@ -66,6 +67,8 @@
   function setNotice(text, kind) {
     window.clearTimeout(noticeTimer);
     notice.className = 'notice' + (text ? ' ' + (kind || 'ok') : '');
+    // Błędy czytnik ekranu ogłasza od razu, zwykłe komunikaty w swojej kolejce.
+    notice.setAttribute('role', kind === 'bad' ? 'alert' : 'status');
     notice.textContent = '';
     if (text) noticeTimer = window.setTimeout(() => { notice.textContent = text; }, 30);
   }
@@ -180,6 +183,7 @@
     if (state.view === 'home') renderHome();
     else if (state.view === 'all') renderAll();
     else if (state.view === 'tools') renderTools();
+    else if (state.view === 'content') renderContent();
     else renderEditor();
     if (focusHeading) {
       const heading = view.querySelector('h2');
@@ -270,6 +274,221 @@
     html += '<div class="card"><h3>Zapasowy zestaw pytań</h3><p class="small">Gdy serwer Google nie odpowiada, quiz korzysta z pliku <code>data/fallback-questions.json</code>. Ten przycisk pobiera aktualne pytania z quizu w tym formacie. Żeby zadziałały, plik trzeba podmienić w repozytorium.</p>' +
       '<button type="button" class="btn" data-action="export">Pobierz plik</button></div>';
     view.innerHTML = html;
+  }
+
+  // ---------- Treści dla gości (O WOMAI, ciekawostki) ----------
+
+  const CONTENT_LISTS = {
+    facts: { one: 'ciekawostka', label: 'Ciekawostka', add: 'Dodaj ciekawostkę', prefix: 'ciekawostka' },
+    sections: { one: 'sekcja', label: 'Sekcja', add: 'Dodaj sekcję', prefix: 'sekcja' }
+  };
+
+  function contentDirty() {
+    return !!(state.content && state.cDraft && state.content.content) && JSON.stringify(state.cDraft) !== JSON.stringify(state.content.content);
+  }
+
+  async function loadContent() {
+    try {
+      const json = await requestJson('GET', 'content');
+      state.content = { content: json.content, version: json.version, updatedAt: json.updatedAt, updatedBy: json.updatedBy };
+      state.cDraft = copy(json.content);
+    } catch (error) {
+      state.content = { error: error.message };
+    }
+    if (state.view === 'content') render(true);
+  }
+
+  function cField(path, label, value, opts) {
+    const o = opts || {};
+    const fid = 'c-' + path.replace(/\./g, '-');
+    const help = o.help ? '<p class="help" id="' + fid + '-h">' + esc(o.help) + '</p>' : '';
+    const described = o.help ? ' aria-describedby="' + fid + '-h"' : '';
+    const input = o.long
+      ? '<textarea id="' + fid + '" data-cfield="' + path + '"' + described + '>' + esc(value) + '</textarea>'
+      : '<input type="text" id="' + fid + '" data-cfield="' + path + '" value="' + esc(value) + '"' + described + (o.placeholder ? ' placeholder="' + esc(o.placeholder) + '"' : '') + ' />';
+    return '<div class="field"><label for="' + fid + '">' + esc(label) + '</label>' + help + input + '</div>';
+  }
+
+  function contentListHtml(kind) {
+    const meta = CONTENT_LISTS[kind];
+    const items = state.cDraft[kind];
+    let html = '';
+    items.forEach((item, i) => {
+      const n = i + 1;
+      const name = '<span class="visually-hidden">: ' + meta.one + ' ' + n + '</span>';
+      html += '<fieldset class="card fieldset item" id="c-' + kind + '-' + i + '"><legend class="label">' + meta.label + ' ' + n + '</legend>' +
+        (kind === 'facts' ? cField(kind + '.' + i + '.category', 'Kategoria', item.category, { placeholder: 'np. Zmysły' }) : '') +
+        cField(kind + '.' + i + '.title', 'Tytuł', item.title) +
+        cField(kind + '.' + i + '.text', 'Treść', item.text, { long: true }) +
+        '<div class="field"><div class="check"><input type="checkbox" id="c-' + kind + '-' + i + '-active" data-cfield="' + kind + '.' + i + '.active"' + (item.active ? ' checked' : '') + ' /><label for="c-' + kind + '-' + i + '-active">Widoczna dla gości</label></div></div>' +
+        '<div class="toolbar">' +
+        (i > 0 ? '<button type="button" class="btn" data-action="c-move" data-kind="' + kind + '" data-index="' + i + '" data-dir="-1">Przesuń wyżej' + name + '</button>' : '') +
+        (i < items.length - 1 ? '<button type="button" class="btn" data-action="c-move" data-kind="' + kind + '" data-index="' + i + '" data-dir="1">Przesuń niżej' + name + '</button>' : '') +
+        '<button type="button" class="btn btn-danger" data-action="c-remove" data-kind="' + kind + '" data-index="' + i + '">Usuń' + name + '</button></div></fieldset>';
+    });
+    return html + '<button type="button" class="btn btn-primary" data-action="c-add" data-kind="' + kind + '" id="c-add-' + kind + '">' + meta.add + '</button>';
+  }
+
+  function contentStatus() {
+    const c = state.content;
+    return c.version ? 'Ostatni zapis: ' + formatDate(c.updatedAt) + ', ' + (c.updatedBy || 'nieznana osoba') + '.' : 'Treści nie były jeszcze zapisywane.';
+  }
+
+  function renderContent() {
+    if (!state.content) {
+      view.innerHTML = '<h2>Treści dla gości</h2><p class="loading">Wczytywanie treści…</p>';
+      loadContent();
+      return;
+    }
+    if (state.content.error) {
+      view.innerHTML = '<h2>Treści dla gości</h2><div class="box-bad">Nie udało się wczytać treści: ' + esc(state.content.error) + '</div><button type="button" class="btn" data-action="c-reload">Spróbuj ponownie</button>';
+      return;
+    }
+    const d = state.cDraft;
+    let html = '<h2>Treści dla gości</h2>' +
+      '<p>Tu wpisujesz teksty do sekcji „O WOMAI” w panelu gościa. Puste pola nie pojawią się u gości. Zmiany zapisuje przycisk „Zapisz”, a goście zobaczą je w ciągu minuty.</p>' +
+      '<p class="muted small">' + esc(contentStatus()) + '</p>' +
+      '<div class="box-warn">Ciekawostki goście widzą już teraz. Wstęp, ścieżki, odwiedziny i dodatkowe sekcje pokaże nowy panel gościa, który jest w przygotowaniu.</div>' +
+      '<div id="cDirtyTop"></div>';
+
+    html += '<section class="card" aria-labelledby="c-about-h"><h3 id="c-about-h">O WOMAI</h3>' +
+      cField('about.intro', 'Wstęp', d.about.intro, { long: true, help: '2–3 zdania o tym, czym jest WOMAI.' }) + '</section>';
+
+    html += '<section class="card" aria-labelledby="c-paths-h"><h3 id="c-paths-h">Ścieżki</h3>';
+    d.paths.forEach((p, i) => {
+      html += '<fieldset class="fieldset"><legend class="label">' + esc(state.content.content.paths[i].title) + '</legend>' +
+        cField('paths.' + i + '.title', 'Nazwa ścieżki', p.title) +
+        cField('paths.' + i + '.text', 'Opis', p.text, { long: true }) + '</fieldset>';
+    });
+    html += '</section>';
+
+    html += '<section class="card" aria-labelledby="c-visit-h"><h3 id="c-visit-h">Odwiedź nas</h3>' +
+      cField('visit.address', 'Adres', d.visit.address, { long: true }) +
+      cField('visit.hours', 'Godziny otwarcia', d.visit.hours, { long: true }) +
+      cField('visit.tickets', 'Bilety', d.visit.tickets, { long: true, help: 'Np. ceny, gdzie kupić, czy trzeba rezerwować.' }) +
+      cField('visit.website', 'Strona internetowa', d.visit.website, { help: 'Pełny adres zaczynający się od https://', placeholder: 'https://' }) + '</section>';
+
+    html += '<section aria-labelledby="c-facts-h"><h3 id="c-facts-h">Ciekawostki (' + d.facts.length + ')</h3>' +
+      '<p class="muted small">Krótkie fakty, które gość przegląda po kolei. Kolejność jest taka jak tutaj.</p>' + contentListHtml('facts') + '</section>';
+
+    html += '<section aria-labelledby="c-sections-h" class="c-gap"><h3 id="c-sections-h">Dodatkowe sekcje (' + d.sections.length + ')</h3>' +
+      '<p class="muted small">Na wszystko, czego nie ma wyżej, np. dostępność, oferta dla szkół, kontakt.</p>' + contentListHtml('sections') + '</section>';
+
+    html += '<div id="cDirtyBottom" class="c-gap"></div>';
+    html += '<details class="tech card c-gap" id="cHistory"><summary>Poprzednie wersje</summary><div id="cHistoryBody"><p class="muted small">Wczytywanie…</p></div></details>';
+
+    view.innerHTML = html;
+    updateContentDirtyUi();
+  }
+
+  function updateContentDirtyUi() {
+    const dirty = contentDirty();
+    ['cDirtyTop', 'cDirtyBottom'].forEach((boxId) => {
+      const box = document.getElementById(boxId);
+      if (!box) return;
+      const want = dirty ? 'dirty' : 'clean';
+      if (box.dataset.state === want) return;
+      box.dataset.state = want;
+      box.innerHTML = dirty
+        ? '<div class="dirty-bar"><span>Masz niezapisane zmiany w treściach.</span><span class="buttons"><button type="button" class="btn" data-action="c-undo">Cofnij</button><button type="button" class="btn btn-primary" data-action="c-save">Zapisz</button></span></div>'
+        : '';
+    });
+  }
+
+  function setPath(obj, path, value) {
+    const parts = path.split('.');
+    let target = obj;
+    for (let i = 0; i < parts.length - 1; i += 1) target = target[parts[i]];
+    target[parts[parts.length - 1]] = value;
+  }
+
+  async function loadContentHistory() {
+    const body = document.getElementById('cHistoryBody');
+    if (!body) return;
+    try {
+      const json = await requestJson('GET', 'contentHistory');
+      const versions = json.versions || [];
+      if (!versions.length) { body.innerHTML = '<p class="muted small">Brak poprzednich wersji.</p>'; return; }
+      body.innerHTML = '<ul class="history">' + versions.map((v) => '<li><span>Wersja ' + v.version + ': ' + esc(formatDate(v.updatedAt)) + ', ' + esc(v.updatedBy || 'nieznana osoba') + '</span>' +
+        (isSuperadmin() ? ' <button type="button" class="btn" data-action="c-restore" data-version="' + v.version + '">Przywróć<span class="visually-hidden"> wersję ' + v.version + '</span></button>' : '') + '</li>').join('') + '</ul>' +
+        (isSuperadmin() ? '' : '<p class="muted small">Przywracać wersje może superadmin.</p>');
+    } catch (error) {
+      body.innerHTML = '<p class="small hint-warn">Nie udało się wczytać wersji: ' + esc(error.message) + '</p>';
+    }
+  }
+
+  function focusIn(selector) {
+    const el = document.querySelector(selector);
+    if (el) el.focus();
+    return !!el;
+  }
+
+  async function runContentAction(action, el) {
+    if (action === 'c-reload') { state.content = null; render(true); return; }
+    if (!state.cDraft) return;
+    if (action === 'c-undo') {
+      state.cDraft = copy(state.content.content);
+      renderContent();
+      setNotice('Cofnięto niezapisane zmiany w treściach.');
+      return;
+    }
+    if (action === 'c-add') {
+      const kind = el.dataset.kind;
+      const list = state.cDraft[kind];
+      const item = { id: CONTENT_LISTS[kind].prefix + '-' + Date.now().toString(36), title: '', text: '', active: true };
+      if (kind === 'facts') item.category = '';
+      list.push(item);
+      renderContent();
+      focusIn('#c-' + kind + '-' + (list.length - 1) + ' input[type="text"]');
+      setNotice('Dodano: ' + CONTENT_LISTS[kind].one + ' ' + list.length + '. Uzupełnij ją i zapisz.');
+      return;
+    }
+    if (action === 'c-remove') {
+      const kind = el.dataset.kind, i = Number(el.dataset.index);
+      state.cDraft[kind].splice(i, 1);
+      renderContent();
+      const left = state.cDraft[kind].length;
+      if (!left || !focusIn('#c-' + kind + '-' + Math.min(i, left - 1) + ' legend + .field input, #c-' + kind + '-' + Math.min(i, left - 1) + ' input[type="text"]')) focusIn('#c-add-' + kind);
+      setNotice('Usunięto: ' + CONTENT_LISTS[kind].one + ' ' + (i + 1) + '. Zmiana nie jest jeszcze zapisana.');
+      return;
+    }
+    if (action === 'c-move') {
+      const kind = el.dataset.kind, i = Number(el.dataset.index), dir = Number(el.dataset.dir);
+      const list = state.cDraft[kind];
+      const [item] = list.splice(i, 1);
+      list.splice(i + dir, 0, item);
+      renderContent();
+      const box = '#c-' + kind + '-' + (i + dir);
+      if (!focusIn(box + ' [data-action="c-move"][data-dir="' + dir + '"]')) focusIn(box + ' [data-action="c-move"]');
+      setNotice('Przesunięto na pozycję ' + (i + dir + 1) + '. Zmiana nie jest jeszcze zapisana.');
+      return;
+    }
+    if (state.busy) return;
+    state.busy = true;
+    document.body.setAttribute('aria-busy', 'true');
+    try {
+      if (action === 'c-save') {
+        const json = await requestJson('POST', 'content', { content: state.cDraft, baseVersion: state.content.version });
+        state.content = { content: json.content, version: json.version, updatedAt: json.updatedAt, updatedBy: json.updatedBy };
+        state.cDraft = copy(json.content);
+        renderContent();
+        setNotice('Zapisano treści. Goście zobaczą zmiany w ciągu minuty.');
+      } else if (action === 'c-restore') {
+        const version = Number(el.dataset.version);
+        if (contentDirty() && !window.confirm('Masz niezapisane zmiany. Przywrócenie wersji je usunie. Kontynuować?')) return;
+        if (!window.confirm('Przywrócić wersję ' + version + '? Obecne treści trafią do poprzednich wersji, więc będzie można je odzyskać.')) return;
+        const json = await requestJson('POST', 'contentRestore', { version });
+        state.content = { content: json.content, version: json.version, updatedAt: json.updatedAt, updatedBy: json.updatedBy };
+        state.cDraft = copy(json.content);
+        renderContent();
+        setNotice('Przywrócono wersję ' + version + '. Zapisano ją jako wersję ' + json.version + '.');
+      }
+    } catch (error) {
+      setNotice('Nie zapisano. ' + error.message, 'bad');
+    } finally {
+      state.busy = false;
+      document.body.removeAttribute('aria-busy');
+    }
   }
 
   function currentRecord() {
@@ -406,10 +625,12 @@
   }
 
   function confirmLeave() {
+    if (state.view === 'content') return !contentDirty() || window.confirm('Masz niezapisane zmiany w treściach. Wyjść bez zapisywania?');
     return state.view !== 'edit' || !isDirty() || window.confirm('Masz niezapisane zmiany w tym pytaniu. Wyjść bez zapisywania?');
   }
 
   function goTo(viewName, message, kind) {
+    if (state.view === 'content' && viewName !== 'content' && state.content && state.content.content) state.cDraft = copy(state.content.content);
     state.view = viewName;
     state.queue = null;
     state.draft = null;
@@ -595,6 +816,8 @@
       renderPreview();
     } else if (action === 'export') {
       downloadJson('fallback-questions.json', guestExport());
+    } else if (action.startsWith('c-')) {
+      runContentAction(action, el);
     } else if (['import', 'refresh-sync', 'dedupe-preview', 'dedupe-run'].includes(action)) {
       runTool(action);
     } else {
@@ -603,6 +826,12 @@
   });
 
   function onFieldChange(event) {
+    const cfield = event.target.dataset.cfield;
+    if (cfield && state.cDraft) {
+      setPath(state.cDraft, cfield, event.target.type === 'checkbox' ? event.target.checked : event.target.value);
+      updateContentDirtyUi();
+      return;
+    }
     const field = event.target.dataset.field;
     if (field && state.draft) {
       if (event.target.type === 'checkbox') state.draft[field] = event.target.checked ? 'tak' : 'nie';
@@ -621,8 +850,12 @@
   document.addEventListener('change', onFieldChange);
 
   window.addEventListener('beforeunload', function (event) {
-    if (state.view === 'edit' && isDirty()) { event.preventDefault(); event.returnValue = ''; }
+    if ((state.view === 'edit' && isDirty()) || (state.view === 'content' && contentDirty())) { event.preventDefault(); event.returnValue = ''; }
   });
+
+  document.addEventListener('toggle', function (event) {
+    if (event.target.id === 'cHistory' && event.target.open) loadContentHistory();
+  }, true);
 
   render();
   signIn();

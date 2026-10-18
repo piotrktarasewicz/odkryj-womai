@@ -12,7 +12,8 @@ window.WOMAI_CONFIG = {
     },
     storageKey: 'womai_guest_progress_v2',
     fallbackDataUrl: '/odkryj-womai/data/fallback-questions.json',
-    factsDataUrl: '/odkryj-womai/data/facts.json',
+    factsDataUrl: '/odkryj-womai/api/content',
+    factsFallbackUrl: '/odkryj-womai/data/facts.json',
     requestTimeoutMs: 10000
   },
   admin: {
