@@ -28,13 +28,19 @@
   <a class="skip-link" href="#main">Przejdź do treści</a>
 
   <header class="topbar" id="topbar" hidden>
-    <img class="topbar-logo" src="./assets/womai-logo.png?v=20261018-2" width="720" height="182" alt="WOMAI" />
+    <picture>
+      <source srcset="./assets/womai-logo-pasek.webp?v=20261018-5" type="image/webp" />
+      <img class="topbar-logo" src="./assets/womai-logo.png?v=20261018-2" width="320" height="81" alt="WOMAI" decoding="async" />
+    </picture>
     <button type="button" class="link-btn" id="homeBtn">Strona główna</button>
   </header>
 
   <main id="main" tabindex="-1">
     <section id="startView" class="view" aria-labelledby="startTitle">
-      <img class="hero-logo" src="./assets/womai-logo-haslo.png?v=20261018-2" width="900" height="288" alt="WOMAI. Inspiracja na wyciągnięcie ręki" />
+      <picture>
+        <source srcset="./assets/womai-logo-haslo.webp?v=20261018-5" type="image/webp" />
+        <img class="hero-logo" src="./assets/womai-logo-haslo.png?v=20261018-2" width="900" height="288" alt="WOMAI. Inspiracja na wyciągnięcie ręki" fetchpriority="high" />
+      </picture>
       <h1 id="startTitle" tabindex="-1">Odkryj świat zmysłów w czterech pytaniach</h1>
       <p class="lead">Krótki quiz inspirowany WOMAI. Po każdej odpowiedzi poznasz ciekawe wyjaśnienie.</p>
       <p id="loadingBox" class="status" role="status">Wczytywanie pytań…</p>
@@ -106,6 +112,6 @@
 
   <script src="./js/config.js?v=20261018-2"></script>
   <script src="./js/api.js?v=20261018-2"></script>
-  <script src="./js/guest.js?v=20261018-3"></script>
+  <script src="./js/guest.js?v=20261018-5"></script>
 </body>
 </html>

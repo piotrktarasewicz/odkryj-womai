@@ -454,10 +454,11 @@
     html += '</section>';
 
     html += '<section class="card" aria-labelledby="c-visit-h"><h3 id="c-visit-h">Odwiedź nas</h3>' +
+      '<p class="muted small">Godziny i ceny zmieniają się na stronie WOMAI. Żeby goście nie trafili na nieaktualne informacje, najlepiej zostaw pola „Godziny otwarcia” i „Bilety” puste i wpisz tylko link do strony WOMAI. Gość zobaczy wtedy odnośnik „Godziny, bilety i oferta na stronie WOMAI”.</p>' +
       cField('visit.address', 'Adres', d.visit.address, { long: true }) +
-      cField('visit.hours', 'Godziny otwarcia', d.visit.hours, { long: true }) +
-      cField('visit.tickets', 'Bilety', d.visit.tickets, { long: true, help: 'Np. ceny, gdzie kupić, czy trzeba rezerwować.' }) +
-      cField('visit.website', 'Strona internetowa', d.visit.website, { help: 'Pełny adres zaczynający się od https://', placeholder: 'https://' }) + '</section>';
+      cField('visit.hours', 'Godziny otwarcia', d.visit.hours, { long: true, help: 'Najlepiej zostaw puste: aktualne godziny są na stronie WOMAI.' }) +
+      cField('visit.tickets', 'Bilety', d.visit.tickets, { long: true, help: 'Najlepiej zostaw puste: aktualne ceny i rezerwacje są na stronie WOMAI.' }) +
+      cField('visit.website', 'Strona internetowa WOMAI', d.visit.website, { help: 'Pełny adres zaczynający się od https://, najlepiej podstrona z godzinami i biletami.', placeholder: 'https://' }) + '</section>';
 
     html += '<section aria-labelledby="c-facts-h"><h3 id="c-facts-h">Ciekawostki (' + d.facts.length + ')</h3>' +
       '<p class="muted small">Krótkie fakty, które gość przegląda po kolei. Kolejność jest taka jak tutaj.</p>' + contentListHtml('facts') + '</section>';

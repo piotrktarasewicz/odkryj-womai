@@ -505,7 +505,7 @@
       if (!items.length && !hasSite) return '';
       return '<section class="about-block tile visit" aria-labelledby="aboutVisitH"><h2 id="aboutVisitH">Odwiedź nas</h2><dl>' +
         items.map(([label, val]) => `<dt>${label}</dt><dd>${esc(val)}</dd>`).join('') +
-        (hasSite ? `<dt>Strona internetowa</dt><dd><a href="${esc(website)}" target="_blank" rel="noopener">Strona WOMAI (otwiera się w nowej karcie)</a></dd>` : '') +
+        (hasSite ? `<dt>Strona internetowa</dt><dd><a href="${esc(website)}" target="_blank" rel="noopener">Godziny, bilety i oferta na stronie WOMAI (otwiera się w nowej karcie)</a></dd>` : '') +
         '</dl></section>';
     }
     if (key.startsWith('path:')) {
